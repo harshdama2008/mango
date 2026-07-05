@@ -7,6 +7,7 @@ import {
   ChatCompletionMessage,
   ChatCompletionMessageParam,
   CompletionCreateParams,
+  CompletionUsage,
 } from "openai/resources/index";
 import type {
   EasyInputMessage,
@@ -28,6 +29,7 @@ import type {
   ResponseReasoningTextDoneEvent,
   ResponseStreamEvent,
   ResponseTextDeltaEvent,
+  ResponseUsage,
 } from "openai/resources/responses/responses.mjs";
 
 import {
@@ -39,8 +41,45 @@ import {
   TextMessagePart,
   ThinkingChatMessage,
   ToolCallDelta,
+  Usage,
 } from "..";
 import { stripImages } from "../util/messageContent";
+
+function fromResponsesUsage(usage: ResponseUsage): Usage {
+  return {
+    promptTokens: usage.input_tokens,
+    completionTokens: usage.output_tokens,
+    promptTokensDetails: usage.input_tokens_details
+      ? { cachedTokens: usage.input_tokens_details.cached_tokens }
+      : undefined,
+    completionTokensDetails: usage.output_tokens_details
+      ? { reasoningTokens: usage.output_tokens_details.reasoning_tokens }
+      : undefined,
+  };
+}
+
+function fromOpenAIUsage(usage: CompletionUsage): Usage {
+  return {
+    promptTokens: usage.prompt_tokens,
+    completionTokens: usage.completion_tokens,
+    promptTokensDetails: usage.prompt_tokens_details
+      ? {
+          cachedTokens: usage.prompt_tokens_details.cached_tokens,
+          audioTokens: usage.prompt_tokens_details.audio_tokens,
+        }
+      : undefined,
+    completionTokensDetails: usage.completion_tokens_details
+      ? {
+          reasoningTokens: usage.completion_tokens_details.reasoning_tokens,
+          acceptedPredictionTokens:
+            usage.completion_tokens_details.accepted_prediction_tokens,
+          rejectedPredictionTokens:
+            usage.completion_tokens_details.rejected_prediction_tokens,
+          audioTokens: usage.completion_tokens_details.audio_tokens,
+        }
+      : undefined,
+  };
+}
 
 function appendReasoningFieldsIfSupported(
   msg: ChatCompletionAssistantMessageParam & {
@@ -318,6 +357,7 @@ export function fromChatResponse(response: ChatCompletion): ChatMessage[] {
   }
 
   // Then add the assistant message
+  const usage = response.usage ? fromOpenAIUsage(response.usage) : undefined;
   const toolCall = message.tool_calls?.[0];
   if (toolCall) {
     messages.push({
@@ -333,11 +373,13 @@ export function fromChatResponse(response: ChatCompletion): ChatMessage[] {
             arguments: (tc as any).function?.arguments,
           },
         })),
+      usage,
     });
   } else {
     messages.push({
       role: "assistant",
       content: message.content ?? "",
+      usage,
     });
   }
 
@@ -393,6 +435,16 @@ export function fromChatCompletionChunk(
       reasoning_details: delta?.reasoning_details as any[],
     };
     return message;
+  }
+
+  // The final chunk of a stream (when `stream_options.include_usage` is set)
+  // has no `choices`/`delta` but carries the request's token usage.
+  if (chunk.usage) {
+    return {
+      role: "assistant",
+      content: "",
+      usage: fromOpenAIUsage(chunk.usage),
+    };
   }
 
   return undefined;
@@ -616,6 +668,12 @@ function handleResponsesStreamEvent(
   if (t === "response.reasoning_text.done") {
     return handleReasoningTextDone(e as ResponseReasoningTextDoneEvent);
   }
+  if (t === "response.completed") {
+    const usage = (e as any).response?.usage as ResponseUsage | undefined;
+    return usage
+      ? { role: "assistant", content: "", usage: fromResponsesUsage(usage) }
+      : undefined;
+  }
   return undefined;
 }
 
@@ -720,12 +778,25 @@ function handleResponsesFinal(
         continue;
       }
     }
-    if (result.length > 0) return result;
+    if (result.length > 0) {
+      if (resp.usage) {
+        result.push({
+          role: "assistant",
+          content: "",
+          usage: fromResponsesUsage(resp.usage),
+        });
+      }
+      return result;
+    }
   }
 
   // Fallback to output_text when no structured output is present
   if (typeof resp.output_text === "string" && resp.output_text.length > 0) {
-    return { role: "assistant", content: resp.output_text };
+    return {
+      role: "assistant",
+      content: resp.output_text,
+      usage: resp.usage ? fromResponsesUsage(resp.usage) : undefined,
+    };
   }
 
   return undefined;

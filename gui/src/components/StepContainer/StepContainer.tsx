@@ -10,6 +10,7 @@ import StyledMarkdownPreview from "../StyledMarkdownPreview";
 import ConversationSummary from "./ConversationSummary";
 import ResponseActions from "./ResponseActions";
 import ThinkingIndicator from "./ThinkingIndicator";
+import TokenUsageDisplay from "./TokenUsageDisplay";
 
 interface StepContainerProps {
   item: ChatHistoryItem;
@@ -103,6 +104,10 @@ export default function StepContainer(props: StepContainerProps) {
         )}
         {props.isLast && <ThinkingIndicator historyItem={props.item} />}
       </div>
+
+      {showResponseActions && (
+        <TokenUsageDisplay promptLogs={props.item.promptLogs} />
+      )}
 
       {showResponseActions && (
         <div

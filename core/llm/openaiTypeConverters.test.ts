@@ -1,5 +1,10 @@
-import { toResponsesInput, isItemType } from "./openaiTypeConverters";
-import { ChatMessage } from "..";
+import {
+  toResponsesInput,
+  isItemType,
+  fromChatResponse,
+  fromChatCompletionChunk,
+} from "./openaiTypeConverters";
+import { AssistantChatMessage, ChatMessage } from "..";
 import type {
   EasyInputMessage,
   ResponseInputItem,
@@ -7,6 +12,10 @@ import type {
   ResponseReasoningItem,
   ResponseOutputMessage,
 } from "openai/resources/responses/responses.mjs";
+import type {
+  ChatCompletion,
+  ChatCompletionChunk,
+} from "openai/resources/index";
 
 function getFunctionCalls(
   items: ResponseInputItem[],
@@ -844,6 +853,76 @@ describe("openaiTypeConverters", () => {
 
         const devMessages = getMessagesByRole(result, "developer");
         expect(devMessages.length).toBe(1);
+      });
+    });
+  });
+
+  describe("usage extraction", () => {
+    it("fromChatResponse should attach usage from a non-streaming response", () => {
+      const response = {
+        choices: [
+          {
+            message: { role: "assistant", content: "Hello there" },
+          },
+        ],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          prompt_tokens_details: { cached_tokens: 2 },
+          completion_tokens_details: { reasoning_tokens: 1 },
+        },
+      } as unknown as ChatCompletion;
+
+      const messages = fromChatResponse(response);
+
+      expect(messages).toHaveLength(1);
+      expect((messages[0] as AssistantChatMessage).usage).toEqual({
+        promptTokens: 10,
+        completionTokens: 5,
+        promptTokensDetails: { cachedTokens: 2, audioTokens: undefined },
+        completionTokensDetails: {
+          reasoningTokens: 1,
+          acceptedPredictionTokens: undefined,
+          rejectedPredictionTokens: undefined,
+          audioTokens: undefined,
+        },
+      });
+    });
+
+    it("fromChatCompletionChunk should return undefined for a plain content delta", () => {
+      const chunk = {
+        choices: [{ delta: { content: "hi" } }],
+      } as unknown as ChatCompletionChunk;
+
+      const result = fromChatCompletionChunk(chunk) as
+        | AssistantChatMessage
+        | undefined;
+
+      expect(result?.usage).toBeUndefined();
+    });
+
+    it("fromChatCompletionChunk should extract usage from the final usage-only chunk", () => {
+      const chunk = {
+        choices: [],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          total_tokens: 150,
+        },
+      } as unknown as ChatCompletionChunk;
+
+      const result = fromChatCompletionChunk(chunk) as
+        | AssistantChatMessage
+        | undefined;
+
+      expect(result).toBeDefined();
+      expect(result?.role).toBe("assistant");
+      expect(result?.usage).toEqual({
+        promptTokens: 100,
+        completionTokens: 50,
+        promptTokensDetails: undefined,
+        completionTokensDetails: undefined,
       });
     });
   });

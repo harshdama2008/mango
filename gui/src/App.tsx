@@ -5,6 +5,7 @@ import { SubmenuContextProvidersProvider } from "./context/SubmenuContextProvide
 import { VscThemeProvider } from "./context/VscTheme";
 import ParallelListeners from "./hooks/ParallelListeners";
 import ConfigPage from "./pages/config";
+import CostDashboardPage from "./pages/costDashboard";
 import ErrorPage from "./pages/error";
 import Chat from "./pages/gui";
 import History from "./pages/history";
@@ -26,8 +27,12 @@ const router = createMemoryRouter([
         element: <Chat />,
       },
       {
-        path: "/history",
+        path: ROUTES.HISTORY,
         element: <History />,
+      },
+      {
+        path: ROUTES.COST_DASHBOARD,
+        element: <CostDashboardPage />,
       },
       {
         path: ROUTES.CONFIG,

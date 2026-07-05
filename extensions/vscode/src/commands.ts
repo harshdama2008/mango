@@ -419,6 +419,13 @@ const getCommandsMap: (
     "mango.viewHistory": () => {
       vscode.commands.executeCommand("mango.navigateTo", "/history", true);
     },
+    "mango.viewCostDashboard": () => {
+      vscode.commands.executeCommand(
+        "mango.navigateTo",
+        "/cost-dashboard",
+        true,
+      );
+    },
     "mango.focusContinueSessionId": async (sessionId: string | undefined) => {
       if (!sessionId) {
         sessionId = await vscode.window.showInputBox({

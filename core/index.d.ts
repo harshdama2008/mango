@@ -421,6 +421,24 @@ export interface Usage {
   };
 }
 
+/**
+ * A single priced chat response, recorded locally (VS Code globalState) for
+ * the Cost Dashboard. One event is recorded per assistant response that
+ * carried token usage.
+ */
+export interface CostDashboardEvent {
+  sessionId: string;
+  sessionTitle: string;
+  /** Milliseconds since epoch, i.e. Date.now() at record time */
+  timestamp: number;
+  modelProvider: string;
+  modelTitle: string;
+  promptTokens: number;
+  completionTokens: number;
+  /** 0 when the model isn't in the hardcoded pricing table */
+  cost: number;
+}
+
 export interface AssistantChatMessage {
   role: "assistant";
   content: MessageContent;
@@ -490,6 +508,7 @@ export interface PromptLog {
   modelProvider: string;
   prompt: string;
   completion: string;
+  usage?: Usage;
 }
 
 export type MessageModes = "chat" | "agent" | "plan" | "background";

@@ -234,6 +234,13 @@
         "group": "Mango"
       },
       {
+        "command": "mango.viewCostDashboard",
+        "category": "Mango",
+        "title": "View Cost Dashboard",
+        "icon": "$(graph-line)",
+        "group": "Mango"
+      },
+      {
         "command": "mango.viewLogs",
         "category": "Mango",
         "title": "View Logs",
@@ -541,6 +548,11 @@
           "when": "view == mango.mangoGUIView"
         },
         {
+          "command": "mango.viewCostDashboard",
+          "group": "navigation@3",
+          "when": "view == mango.mangoGUIView"
+        },
+        {
           "command": "mango.openConfigPage",
           "group": "navigation@4",
           "when": "view == mango.mangoGUIView"
@@ -560,6 +572,11 @@
         {
           "command": "mango.viewHistory",
           "group": "navigation@2",
+          "when": "activeWebviewPanelId == mango.mangoGUIView"
+        },
+        {
+          "command": "mango.viewCostDashboard",
+          "group": "navigation@3",
           "when": "activeWebviewPanelId == mango.mangoGUIView"
         }
       ],

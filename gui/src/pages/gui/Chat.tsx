@@ -19,6 +19,7 @@ import { Button, lightGray, vscBackground } from "../../components";
 import { useFindWidget } from "../../components/find/FindWidget";
 import TimelineItem from "../../components/gui/TimelineItem";
 import { NewSessionButton } from "../../components/mainInput/belowMainInput/NewSessionButton";
+import { SessionCostIndicator } from "../../components/mainInput/belowMainInput/SessionCostIndicator";
 import ThinkingBlockPeek from "../../components/mainInput/belowMainInput/ThinkingBlockPeek";
 import MangoInputBox from "../../components/mainInput/MangoInputBox";
 import { useOnboardingCard } from "../../components/OnboardingCard";
@@ -440,6 +441,7 @@ export function Chat() {
                 </NewSessionButton>
               )}
             </div>
+            <SessionCostIndicator />
           </div>
           <FatalErrorIndicator />
           {!hasDismissedExploreDialog && <ExploreDialogWatcher />}

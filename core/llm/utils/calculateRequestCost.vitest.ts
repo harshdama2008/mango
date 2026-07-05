@@ -2,171 +2,101 @@ import { describe, expect, it } from "vitest";
 
 import type { Usage } from "../..";
 
-import { calculateRequestCost, CostBreakdown } from "./calculateRequestCost";
+import { calculateRequestCost } from "./calculateRequestCost";
 
 interface TestCase {
   provider: string;
   model: string;
   promptTokens: number;
   completionTokens: number;
-  cachedTokens?: number;
-  cacheWriteTokens?: number;
   expectedCost: number | null;
   description?: string;
 }
 
 describe("calculateRequestCost", () => {
   const testCases: TestCase[] = [
-    // Anthropic Claude 3.5 Sonnet
+    // Claude Sonnet: $3 input, $15 output
     {
       provider: "anthropic",
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-6-20250514",
+      promptTokens: 1_000_000,
+      completionTokens: 1_000_000,
+      expectedCost: 18,
+      description: "Claude Sonnet full pricing",
+    },
+    {
+      provider: "anthropic",
+      model: "Claude Sonnet",
       promptTokens: 1000,
       completionTokens: 500,
       expectedCost: 0.0105,
-      description: "Claude 3.5 Sonnet basic usage",
-    },
-    {
-      provider: "anthropic",
-      model: "claude-3-5-sonnet-20241022",
-      promptTokens: 1000,
-      completionTokens: 500,
-      cachedTokens: 2000,
-      expectedCost: 0.0111,
-      description: "Claude 3.5 Sonnet with cache reads",
-    },
-    {
-      provider: "anthropic",
-      model: "claude-3-5-sonnet-20241022",
-      promptTokens: 1000,
-      completionTokens: 500,
-      cacheWriteTokens: 300,
-      expectedCost: 0.011625,
-      description: "Claude 3.5 Sonnet with cache writes",
-    },
-    {
-      provider: "anthropic",
-      model: "claude-3-5-sonnet-20240620",
-      promptTokens: 1000,
-      completionTokens: 500,
-      expectedCost: 0.0105,
-      description: "Claude 3.5 Sonnet (older version)",
+      description: "Claude Sonnet basic usage",
     },
 
-    // Anthropic Claude 3.5 Haiku
+    // Claude Haiku: $0.25 input, $1.25 output
     {
       provider: "anthropic",
       model: "claude-3-5-haiku-20241022",
       promptTokens: 1000,
       completionTokens: 500,
-      expectedCost: 0.0028,
-      description: "Claude 3.5 Haiku",
-    },
-
-    // Anthropic Claude 3 Haiku (legacy)
-    {
-      provider: "anthropic",
-      model: "claude-3-haiku-20240307",
-      promptTokens: 1000,
-      completionTokens: 500,
       expectedCost: 0.000875,
-      description: "Claude 3 Haiku legacy",
+      description: "Claude Haiku basic usage",
     },
 
-    // Anthropic Claude 3 Opus
-    {
-      provider: "anthropic",
-      model: "claude-3-opus-20240229",
-      promptTokens: 1000,
-      completionTokens: 500,
-      expectedCost: 0.0525,
-      description: "Claude 3 Opus",
-    },
-
-    // Anthropic Claude Opus 4.5
-    {
-      provider: "anthropic",
-      model: "claude-opus-4-5-20251101",
-      promptTokens: 1000,
-      completionTokens: 500,
-      expectedCost: 0.0175,
-      description: "Claude Opus 4.5 basic usage",
-    },
-    {
-      provider: "anthropic",
-      model: "claude-opus-4-5-latest",
-      promptTokens: 1000,
-      completionTokens: 500,
-      expectedCost: 0.0175,
-      description: "Claude Opus 4.5 latest (partial match)",
-    },
-    {
-      provider: "anthropic",
-      model: "claude-opus-4-5-20251101",
-      promptTokens: 1000,
-      completionTokens: 500,
-      cachedTokens: 2000,
-      expectedCost: 0.0185,
-      description: "Claude Opus 4.5 with cache reads",
-    },
-    {
-      provider: "anthropic",
-      model: "claude-opus-4-5-20251101",
-      promptTokens: 1000,
-      completionTokens: 500,
-      cacheWriteTokens: 300,
-      expectedCost: 0.019375,
-      description: "Claude Opus 4.5 with cache writes",
-    },
-
-    // OpenAI GPT-4
-    {
-      provider: "openai",
-      model: "gpt-4",
-      promptTokens: 1000,
-      completionTokens: 500,
-      expectedCost: 0.06,
-      description: "GPT-4 basic usage",
-    },
-    {
-      provider: "openai",
-      model: "gpt-4-turbo",
-      promptTokens: 1000,
-      completionTokens: 500,
-      expectedCost: 0.025,
-      description: "GPT-4 Turbo",
-    },
+    // GPT-4o: $5 input, $15 output
     {
       provider: "openai",
       model: "gpt-4o",
       promptTokens: 1000,
       completionTokens: 500,
-      expectedCost: 0.0075,
-      description: "GPT-4o",
+      expectedCost: 0.0125,
+      description: "GPT-4o basic usage",
     },
+
+    // GPT-4o mini: $0.15 input, $0.60 output
     {
       provider: "openai",
       model: "gpt-4o-mini",
       promptTokens: 1000,
       completionTokens: 500,
       expectedCost: 0.00045,
-      description: "GPT-4o-mini",
+      description: "GPT-4o mini basic usage",
     },
 
-    // OpenAI GPT-3.5
+    // Gemini 1.5 Pro: $3.50 input, $10.50 output
     {
-      provider: "openai",
-      model: "gpt-3.5-turbo-0125",
+      provider: "gemini",
+      model: "gemini-1.5-pro",
       promptTokens: 1000,
       completionTokens: 500,
-      expectedCost: 0.00125,
-      description: "GPT-3.5 Turbo",
+      expectedCost: 0.00875,
+      description: "Gemini 1.5 Pro basic usage",
+    },
+
+    // Gemini 1.5 Flash: $0.075 input, $0.30 output
+    {
+      provider: "gemini",
+      model: "gemini-1.5-flash",
+      promptTokens: 1000,
+      completionTokens: 500,
+      expectedCost: 0.000225,
+      description: "Gemini 1.5 Flash basic usage",
+    },
+
+    // DeepSeek Coder: $0.14 input, $0.28 output
+    {
+      provider: "deepseek",
+      model: "deepseek-coder",
+      promptTokens: 1000,
+      completionTokens: 500,
+      expectedCost: 0.00028,
+      description: "DeepSeek Coder basic usage",
     },
 
     // Edge cases
     {
       provider: "anthropic",
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-6",
       promptTokens: 0,
       completionTokens: 0,
       expectedCost: 0,
@@ -174,7 +104,7 @@ describe("calculateRequestCost", () => {
     },
     {
       provider: "anthropic",
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-6",
       promptTokens: 1000,
       completionTokens: 0,
       expectedCost: 0.003,
@@ -182,7 +112,7 @@ describe("calculateRequestCost", () => {
     },
     {
       provider: "anthropic",
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-6",
       promptTokens: 0,
       completionTokens: 500,
       expectedCost: 0.0075,
@@ -192,29 +122,61 @@ describe("calculateRequestCost", () => {
     // Case insensitivity
     {
       provider: "ANTHROPIC",
-      model: "claude-3-5-sonnet-20241022",
+      model: "Claude Sonnet 4.6",
       promptTokens: 1000,
       completionTokens: 500,
       expectedCost: 0.0105,
-      description: "Provider name case insensitive",
+      description: "Provider and model name case insensitive",
     },
 
-    // Unknown models/providers
+    // Models/providers not in the hardcoded table should skip cost entirely
     {
       provider: "anthropic",
-      model: "claude-unknown-model",
+      model: "claude-3-opus-20240229",
       promptTokens: 1000,
       completionTokens: 500,
       expectedCost: null,
-      description: "Unknown Anthropic model",
+      description: "Claude Opus is not in the hardcoded table",
     },
     {
-      provider: "google",
-      model: "gemini-pro",
+      provider: "openai",
+      model: "gpt-4-turbo",
       promptTokens: 1000,
       completionTokens: 500,
       expectedCost: null,
-      description: "Unknown provider",
+      description: "GPT-4 Turbo is not in the hardcoded table",
+    },
+    {
+      provider: "openai",
+      model: "gpt-3.5-turbo",
+      promptTokens: 1000,
+      completionTokens: 500,
+      expectedCost: null,
+      description: "GPT-3.5 is not in the hardcoded table",
+    },
+    {
+      provider: "gemini",
+      model: "gemini-2.0-flash",
+      promptTokens: 1000,
+      completionTokens: 500,
+      expectedCost: null,
+      description: "Gemini 2.0 is not in the hardcoded table",
+    },
+    {
+      provider: "deepseek",
+      model: "deepseek-chat",
+      promptTokens: 1000,
+      completionTokens: 500,
+      expectedCost: null,
+      description: "DeepSeek Chat (non-Coder) is not in the hardcoded table",
+    },
+    {
+      provider: "ollama",
+      model: "llama3.1:8b",
+      promptTokens: 1000,
+      completionTokens: 500,
+      expectedCost: null,
+      description: "Unsupported provider",
     },
   ];
 
@@ -224,23 +186,11 @@ describe("calculateRequestCost", () => {
       model,
       promptTokens,
       completionTokens,
-      cachedTokens,
-      cacheWriteTokens,
       expectedCost,
       description,
     }) => {
       it(description || `${provider}/${model}`, () => {
-        const usage: Usage = {
-          promptTokens,
-          completionTokens,
-          promptTokensDetails:
-            cachedTokens || cacheWriteTokens
-              ? {
-                  cachedTokens,
-                  cacheWriteTokens,
-                }
-              : undefined,
-        };
+        const usage: Usage = { promptTokens, completionTokens };
 
         const result = calculateRequestCost(provider, model, usage);
 

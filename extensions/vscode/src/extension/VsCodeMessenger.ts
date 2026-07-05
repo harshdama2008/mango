@@ -18,6 +18,10 @@ import * as vscode from "vscode";
 
 import { ApplyManager } from "../apply";
 import { VerticalDiffManager } from "../diff/vertical/manager";
+import {
+  getCostDashboardEvents,
+  recordCostDashboardEvent,
+} from "../util/costDashboardStorage";
 import { addCurrentSelectionToEdit } from "../quickEdit/AddCurrentSelection";
 import EditDecorationManager from "../quickEdit/EditDecorationManager";
 import { handleLLMError } from "../util/errorHandling";
@@ -109,6 +113,14 @@ export class VsCodeMessenger {
     });
     this.onWebview("toggleFullScreen", (msg) => {
       vscode.commands.executeCommand("mango.openInNewWindow");
+    });
+
+    this.onWebview("costDashboard/recordEvent", (msg) => {
+      recordCostDashboardEvent(this.context, msg.data);
+    });
+
+    this.onWebview("costDashboard/getEvents", () => {
+      return getCostDashboardEvents(this.context);
     });
 
     this.onWebview("acceptDiff", async ({ data: { filepath, streamId } }) => {

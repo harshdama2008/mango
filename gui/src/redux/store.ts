@@ -15,6 +15,7 @@ import { createFilter } from "redux-persist-transform-filter";
 import autoMergeLevel2 from "redux-persist/lib/stateReconciler/autoMergeLevel2";
 import storage from "redux-persist/lib/storage";
 import { IdeMessenger, IIdeMessenger } from "../context/IdeMessenger";
+import { createCostDashboardMiddleware } from "./middleware/costDashboardMiddleware";
 import configReducer from "./slices/configSlice";
 import editModeStateReducer from "./slices/editState";
 import indexingReducer from "./slices/indexingSlice";
@@ -125,7 +126,7 @@ export function setupStore(options: { ideMessenger?: IIdeMessenger }) {
             ideMessenger,
           },
         },
-      }),
+      }).concat(createCostDashboardMiddleware(ideMessenger)),
     // This can be uncommented to get detailed Redux logs
     // .concat(logger),
   });

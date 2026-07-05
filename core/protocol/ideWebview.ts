@@ -6,6 +6,7 @@ import {
   AddToChatPayload,
   ApplyState,
   ApplyToFilePayload,
+  CostDashboardEvent,
   HighlightedCodePayload,
   MessageContent,
   RangeInFileWithContents,
@@ -50,6 +51,8 @@ export type ToIdeFromWebviewProtocol = ToIdeFromWebviewOrCoreProtocol & {
   "edit/addCurrentSelection": [undefined, void];
   "edit/clearDecorations": [undefined, void];
   "session/share": [{ sessionId: string }, void];
+  "costDashboard/recordEvent": [CostDashboardEvent, void];
+  "costDashboard/getEvents": [undefined, CostDashboardEvent[]];
 };
 
 export type ToWebviewFromIdeProtocol = ToWebviewFromIdeOrCoreProtocol & {
