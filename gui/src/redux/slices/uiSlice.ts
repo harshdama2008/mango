@@ -6,6 +6,7 @@ import {
   defaultOnboardingCardState,
   OnboardingCardState,
 } from "../../components/OnboardingCard";
+import { ModelTier } from "../../util/modelRouting";
 import { getLocalStorage, LocalStorageKey } from "../../util/localStorage";
 
 export type RulePolicy = "on" | "off";
@@ -29,6 +30,15 @@ type UIState = {
   ruleSettings: RulePolicies;
   reasoningSettings: ReasoningSettings;
   ttsActive: boolean;
+  /** Key of the recommended model catalog entry chosen for everyday use (autocomplete + quick questions), or null if unset */
+  everydayModelKey: string | null;
+  /** Key of the recommended model catalog entry chosen for complex tasks and agent mode, or null if unset */
+  powerfulModelKey: string | null;
+  /**
+   * Manual routing override for the NEXT message only, set by clicking the
+   * model routing indicator. Cleared after every send (not persisted).
+   */
+  messageModelOverride: ModelTier | null;
 };
 
 export const DEFAULT_TOOL_SETTING: ToolPolicy = "allowedWithPermission";
@@ -49,6 +59,9 @@ export const DEFAULT_UI_SLICE: UIState = {
   },
   ruleSettings: {},
   reasoningSettings: {},
+  everydayModelKey: null,
+  powerfulModelKey: null,
+  messageModelOverride: null,
 };
 
 export const uiSlice = createSlice({
@@ -149,6 +162,18 @@ export const uiSlice = createSlice({
       state.reasoningSettings[action.payload.modelTitle] =
         action.payload.enabled;
     },
+    setEverydayModelKey: (state, { payload }: PayloadAction<string | null>) => {
+      state.everydayModelKey = payload;
+    },
+    setPowerfulModelKey: (state, { payload }: PayloadAction<string | null>) => {
+      state.powerfulModelKey = payload;
+    },
+    setMessageModelOverride: (
+      state,
+      { payload }: PayloadAction<ModelTier | null>,
+    ) => {
+      state.messageModelOverride = payload;
+    },
   },
 });
 
@@ -166,6 +191,9 @@ export const {
   toggleRuleSetting,
   setTTSActive,
   setReasoningSetting,
+  setEverydayModelKey,
+  setPowerfulModelKey,
+  setMessageModelOverride,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

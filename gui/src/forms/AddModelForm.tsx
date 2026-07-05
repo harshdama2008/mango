@@ -1,3 +1,4 @@
+import { ModelRole } from "@mangodev/config-yaml";
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -23,6 +24,12 @@ import {
 
 interface AddModelFormProps {
   onDone: () => void;
+  /**
+   * By default, newly added models get roles ["chat", "summarize", "apply",
+   * "edit"] (NOT "autocomplete" - see core/config/yaml/loadYaml.ts). Pass
+   * this to override, e.g. to also make a model available for autocomplete.
+   */
+  forceRoles?: ModelRole[];
 }
 
 const MODEL_PROVIDERS_URL =
@@ -30,7 +37,7 @@ const MODEL_PROVIDERS_URL =
 const CODESTRAL_URL = "https://console.mistral.ai/codestral";
 const CONTINUE_SETUP_URL = "https://docs.continue.dev/setup/overview";
 
-export function AddModelForm({ onDone }: AddModelFormProps) {
+export function AddModelForm({ onDone, forceRoles }: AddModelFormProps) {
   const [selectedProvider, setSelectedProvider] = useState<ProviderInfo>(
     providers["openai"]!,
   );
@@ -158,6 +165,7 @@ export function AddModelForm({ onDone }: AddModelFormProps) {
       provider: selectedProvider.provider,
       title: selectedModel.title,
       ...(hasValidApiKey ? { apiKey } : {}),
+      ...(forceRoles ? { roles: forceRoles } : {}),
     };
 
     ideMessenger.post("config/addModel", { model });

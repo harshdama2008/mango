@@ -58,6 +58,8 @@ const saveSubsetFilters = [
     "toolGroupSettings",
     "ruleSettings",
     "reasoningSettings",
+    "everydayModelKey",
+    "powerfulModelKey",
   ]),
   createFilter("indexing", []),
   createFilter("tabs", ["tabs"]),

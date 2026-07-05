@@ -25,6 +25,7 @@ import { Button } from "../ui";
 import { useFontSize } from "../ui/font";
 import ContextStatus from "./ContextStatus";
 import HoverItem from "./InputToolbar/HoverItem";
+import { ModelRoutingIndicator } from "./ModelRoutingIndicator";
 
 export interface ToolbarOptions {
   hideUseCodebase?: boolean;
@@ -96,6 +97,11 @@ function InputToolbar(props: InputToolbarProps) {
               <ModelSelect />
             </HoverItem>
           </ToolTip>
+          {props.isMainInput && !isInEdit && (
+            <HoverItem className="!p-0">
+              <ModelRoutingIndicator />
+            </HoverItem>
+          )}
           <div className="xs:flex text-description -mb-1 hidden items-center transition-colors duration-200">
             {props.toolbarOptions?.hideImageUpload ||
               (supportsImages && (

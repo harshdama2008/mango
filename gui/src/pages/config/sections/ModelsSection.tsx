@@ -8,11 +8,21 @@ import { useAuth } from "../../../context/Auth";
 import { IdeMessengerContext } from "../../../context/IdeMessenger";
 import { AddModelForm } from "../../../forms/AddModelForm";
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
-import { setDialogMessage, setShowDialog } from "../../../redux/slices/uiSlice";
+import {
+  setDialogMessage,
+  setEverydayModelKey,
+  setPowerfulModelKey,
+  setShowDialog,
+} from "../../../redux/slices/uiSlice";
 import { updateSelectedModelByRole } from "../../../redux/thunks/updateSelectedModelByRole";
 import { getMetaKeyLabel, isJetBrains } from "../../../util";
+import {
+  EVERYDAY_MODEL_OPTIONS,
+  POWERFUL_MODEL_OPTIONS,
+} from "../../../util/recommendedModels";
 import { ConfigHeader } from "../components/ConfigHeader";
 import { ModelRoleRow } from "../components/ModelRoleRow";
+import { ModelTierRow } from "../components/ModelTierRow";
 
 const MODEL_DOCS_URLS = {
   chat: {
@@ -39,6 +49,9 @@ export function ModelsSection() {
   const jetbrains = isJetBrains();
   const metaKey = getMetaKeyLabel();
   const [showAdditionalRoles, setShowAdditionalRoles] = useState(false);
+
+  const everydayModelKey = useAppSelector((state) => state.ui.everydayModelKey);
+  const powerfulModelKey = useAppSelector((state) => state.ui.powerfulModelKey);
 
   function handleRoleUpdate(role: ModelRole, model: ModelDescription | null) {
     if (!model) {
@@ -76,6 +89,28 @@ export function ModelsSection() {
         onAddClick={handleAddModel}
         addButtonTooltip="Add model"
       />
+
+      <Card>
+        <ModelTierRow
+          title="Everyday Model"
+          description="A fast, low-cost model used for autocomplete and simple questions"
+          role="autocomplete"
+          options={EVERYDAY_MODEL_OPTIONS}
+          selectedKey={everydayModelKey}
+          onSelectKey={(key) => dispatch(setEverydayModelKey(key))}
+        />
+
+        <Divider />
+
+        <ModelTierRow
+          title="Powerful Model"
+          description="A stronger model used for complex tasks and Agent mode"
+          role="chat"
+          options={POWERFUL_MODEL_OPTIONS}
+          selectedKey={powerfulModelKey}
+          onSelectKey={(key) => dispatch(setPowerfulModelKey(key))}
+        />
+      </Card>
 
       <Card>
         <ModelRoleRow

@@ -32,6 +32,7 @@ import {
   selectDoneApplyStates,
   selectPendingToolCalls,
 } from "../../redux/selectors/selectToolCalls";
+import { selectSelectedProfile } from "../../redux/slices/profilesSlice";
 import {
   cancelToolCall,
   ChatHistoryItemWithMessageId,
@@ -41,6 +42,7 @@ import {
 import { streamEditThunk } from "../../redux/thunks/edit";
 import { loadLastSession } from "../../redux/thunks/session";
 import { streamResponseThunk } from "../../redux/thunks/streamResponse";
+import { updateSelectedModelByRole } from "../../redux/thunks/updateSelectedModelByRole";
 import { isJetBrains, isMetaEquivalentKeyPressed } from "../../util";
 import { ToolCallDiv } from "./ToolCallDiv";
 
@@ -51,10 +53,20 @@ import { DeprecationBanner } from "../../components/DeprecationBanner";
 import { FatalErrorIndicator } from "../../components/config/FatalErrorNotice";
 import InlineErrorMessage from "../../components/mainInput/InlineErrorMessage";
 import { resolveEditorContent } from "../../components/mainInput/TipTapEditor/utils/resolveEditorContent";
-import { setDialogMessage, setShowDialog } from "../../redux/slices/uiSlice";
+import {
+  setDialogMessage,
+  setMessageModelOverride,
+  setShowDialog,
+} from "../../redux/slices/uiSlice";
 import { RootState } from "../../redux/store";
 import { cancelStream } from "../../redux/thunks/cancelStream";
+import {
+  countDistinctAttachedFiles,
+  getMessageTextLength,
+} from "../../util/countAttachedFiles";
 import { getLocalStorage, setLocalStorage } from "../../util/localStorage";
+import { computeAutoRoutedTier } from "../../util/modelRouting";
+import { resolveModelForTier } from "../../util/recommendedModels";
 import { EmptyChatBody } from "./EmptyChatBody";
 import { ExploreDialogWatcher } from "./ExploreDialogWatcher";
 import { useAutoScroll } from "./useAutoScroll";
@@ -159,7 +171,7 @@ export function Chat() {
   );
 
   const sendInput = useCallback(
-    (
+    async (
       editorState: JSONContent,
       modifiers: InputModifiers,
       index?: number,
@@ -170,9 +182,54 @@ export function Chat() {
       const latestPendingApplyStates = selectDoneApplyStates(stateSnapshot);
       const isCurrentlyInEdit = stateSnapshot.session.isInEdit;
       const codeToEditSnapshot = stateSnapshot.editModeState.codeToEdit;
-      const selectedModelByRole =
-        stateSnapshot.config.config.selectedModelByRole;
       const currentMode = stateSnapshot.session.mode;
+
+      // Apply automatic Everyday/Powerful model routing before reading the
+      // chat model below - only for chat/agent sends, not Edit mode (which
+      // has its own dedicated model role).
+      if (!isCurrentlyInEdit) {
+        const { everydayModelKey, powerfulModelKey, messageModelOverride } =
+          stateSnapshot.ui;
+        const routing = computeAutoRoutedTier({
+          mode: currentMode,
+          messageLength: getMessageTextLength(editorState),
+          attachedFileCount: countDistinctAttachedFiles(editorState),
+        });
+        const effectiveTier = messageModelOverride ?? routing.tier;
+        const routedModel = resolveModelForTier(
+          effectiveTier,
+          everydayModelKey,
+          powerfulModelKey,
+          stateSnapshot.config.config.modelsByRole.chat,
+        );
+
+        if (
+          routedModel &&
+          routedModel.title !==
+            stateSnapshot.config.config.selectedModelByRole.chat?.title
+        ) {
+          // Read fresh rather than relying on the useAuth() closure: since
+          // InputToolbar is memoized without comparing onEnter, sendInput
+          // can be called from a stale closure with an outdated selectedProfile.
+          const freshSelectedProfile = selectSelectedProfile(stateSnapshot);
+          await dispatch(
+            updateSelectedModelByRole({
+              role: "chat",
+              modelTitle: routedModel.title,
+              selectedProfile: freshSelectedProfile,
+            }),
+          );
+        }
+
+        // The override only applies to the message being sent right now
+        if (messageModelOverride) {
+          dispatch(setMessageModelOverride(null));
+        }
+      }
+
+      // Re-read state: the routing update above may have changed selectedModelByRole.chat
+      const selectedModelByRole =
+        reduxStore.getState().config.config.selectedModelByRole;
 
       // Cancel all pending tool calls
       latestPendingToolCalls.forEach((toolCallState) => {
