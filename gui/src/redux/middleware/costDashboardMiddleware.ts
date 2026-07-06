@@ -22,6 +22,17 @@ export function createCostDashboardMiddleware(
       const sessionId = state.session.id;
       const sessionTitle = state.session.title;
 
+      // addPromptCompletionPair always appends to the current last history
+      // item (see sessionSlice.ts), so its index is this event's stable
+      // "slot" - regenerating a turn reuses the same slot with a fresh
+      // (empty) promptLogs array, while additional tool-call round trips
+      // within the same still-in-progress turn keep appending to it.
+      const historySlotIndex = state.session.history.length - 1;
+      const totalLogsAtSlot =
+        state.session.history[historySlotIndex]?.promptLogs?.length ?? 0;
+      const priorLogCount = totalLogsAtSlot - action.payload.length;
+      let isFirstLogInBatch = true;
+
       for (const log of action.payload) {
         if (!log.usage) {
           continue;
@@ -42,7 +53,14 @@ export function createCostDashboardMiddleware(
           promptTokens: log.usage.promptTokens,
           completionTokens: log.usage.completionTokens,
           cost: costBreakdown?.cost ?? 0,
+          isPriced: costBreakdown !== null,
+          historySlotIndex,
+          // Only the very first log recorded for a freshly-started response
+          // at this slot should tell storage to clear out whatever was
+          // recorded there before (i.e. the superseded regenerated response).
+          startOfTurn: isFirstLogInBatch && priorLogCount <= 0,
         });
+        isFirstLogInBatch = false;
       }
     }
 

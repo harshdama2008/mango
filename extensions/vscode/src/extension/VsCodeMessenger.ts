@@ -19,7 +19,9 @@ import * as vscode from "vscode";
 import { ApplyManager } from "../apply";
 import { VerticalDiffManager } from "../diff/vertical/manager";
 import {
+  clearCostDashboardEvents,
   getCostDashboardEvents,
+  getCostDashboardTrimMarker,
   recordCostDashboardEvent,
 } from "../util/costDashboardStorage";
 import { addCurrentSelectionToEdit } from "../quickEdit/AddCurrentSelection";
@@ -120,7 +122,14 @@ export class VsCodeMessenger {
     });
 
     this.onWebview("costDashboard/getEvents", () => {
-      return getCostDashboardEvents(this.context);
+      return {
+        events: getCostDashboardEvents(this.context),
+        trimmedBefore: getCostDashboardTrimMarker(this.context),
+      };
+    });
+
+    this.onWebview("costDashboard/clearEvents", () => {
+      clearCostDashboardEvents(this.context);
     });
 
     this.onWebview("acceptDiff", async ({ data: { filepath, streamId } }) => {

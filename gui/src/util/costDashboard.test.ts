@@ -15,6 +15,9 @@ function event(overrides: Partial<CostDashboardEvent>): CostDashboardEvent {
     promptTokens: 1000,
     completionTokens: 500,
     cost: 0.0105,
+    isPriced: true,
+    historySlotIndex: 1,
+    startOfTurn: true,
     ...overrides,
   };
 }
@@ -43,6 +46,19 @@ describe("summarizeCostEvents", () => {
     expect(summary.totalToday).toBeCloseTo(1, 6);
     expect(summary.totalThisWeek).toBeCloseTo(3, 6);
     expect(summary.totalThisMonth).toBeCloseTo(7, 6);
+  });
+
+  it("excludes future-dated/clock-skewed events from every window instead of counting them as Today", () => {
+    const events = [
+      event({ timestamp: NOW - 1 * HOUR, cost: 1 }), // a normal, in-window event
+      event({ timestamp: NOW + 5 * DAY, cost: 100 }), // ahead of "now" - negative age
+    ];
+
+    const summary = summarizeCostEvents(events, NOW);
+
+    expect(summary.totalToday).toBeCloseTo(1, 6);
+    expect(summary.totalThisWeek).toBeCloseTo(1, 6);
+    expect(summary.totalThisMonth).toBeCloseTo(1, 6);
   });
 
   it("groups events by session and sums cost and message count", () => {

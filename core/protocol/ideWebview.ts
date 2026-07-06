@@ -52,7 +52,19 @@ export type ToIdeFromWebviewProtocol = ToIdeFromWebviewOrCoreProtocol & {
   "edit/clearDecorations": [undefined, void];
   "session/share": [{ sessionId: string }, void];
   "costDashboard/recordEvent": [CostDashboardEvent, void];
-  "costDashboard/getEvents": [undefined, CostDashboardEvent[]];
+  "costDashboard/getEvents": [
+    undefined,
+    {
+      events: CostDashboardEvent[];
+      /**
+       * Timestamp of the oldest surviving event as of the most recent trim,
+       * or null if nothing has ever been trimmed - lets the UI warn that
+       * totals may be missing data older than this point.
+       */
+      trimmedBefore: number | null;
+    },
+  ];
+  "costDashboard/clearEvents": [undefined, void];
 };
 
 export type ToWebviewFromIdeProtocol = ToWebviewFromIdeOrCoreProtocol & {

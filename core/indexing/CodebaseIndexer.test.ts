@@ -590,7 +590,33 @@ describe("CodebaseIndexer", () => {
         expect(mockGetWorkspaceDirs).toHaveBeenCalledTimes(0);
       });
 
-      test("should call refreshCodebaseIndex when all conditions are met", async () => {
+      test("should not call refreshCodebaseIndex when indexing hasn't been explicitly requested yet", async () => {
+        // Conservative default: even with an embed model and a codebase
+        // provider configured, config load/update alone shouldn't trigger
+        // eager indexing - only an explicit @codebase use or manual re-index
+        // should (see indexingExplicitlyRequested).
+        const configResult: ConfigResult<MangoConfig> = {
+          config: {
+            contextProviders: [new CodebaseContextProvider({})],
+            selectedModelByRole: {
+              embed: {
+                model: "test-model",
+                provider: "test-provider",
+              },
+            },
+          } as unknown as MangoConfig,
+          errors: [],
+          configLoadInterrupted: false,
+        };
+
+        expect((testIndexer as any).indexingExplicitlyRequested).toBe(false);
+        await testIndexer.testHandleConfigUpdate(configResult);
+
+        expect(mockRefreshCodebaseIndex).toHaveBeenCalledTimes(0);
+      });
+
+      test("should call refreshCodebaseIndex when all conditions are met and indexing has been explicitly requested", async () => {
+        (testIndexer as any).indexingExplicitlyRequested = true;
         const configResult: ConfigResult<MangoConfig> = {
           config: {
             contextProviders: [new CodebaseContextProvider({})],
@@ -615,6 +641,7 @@ describe("CodebaseIndexer", () => {
       });
 
       test("should set config property before checking conditions", async () => {
+        (testIndexer as any).indexingExplicitlyRequested = true;
         const testConfig = {
           contextProviders: [new CodebaseContextProvider({})],
           selectedModelByRole: {
@@ -640,6 +667,7 @@ describe("CodebaseIndexer", () => {
       });
 
       test("should handle multiple context providers correctly", async () => {
+        (testIndexer as any).indexingExplicitlyRequested = true;
         const configResult: ConfigResult<MangoConfig> = {
           config: {
             contextProviders: [

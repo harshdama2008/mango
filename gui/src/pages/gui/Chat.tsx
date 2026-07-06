@@ -218,14 +218,20 @@ export function Chat() {
               role: "chat",
               modelTitle: routedModel.title,
               selectedProfile: freshSelectedProfile,
+              // Routing is a per-message decision, not a persisted user
+              // preference - don't overwrite what the user explicitly
+              // selected in config.yaml.
+              persist: false,
             }),
           );
         }
+      }
 
-        // The override only applies to the message being sent right now
-        if (messageModelOverride) {
-          dispatch(setMessageModelOverride(null));
-        }
+      // The override only applies to the message being sent right now -
+      // clear it regardless of mode, or an override set before switching to
+      // Edit mode leaks into the next chat message.
+      if (stateSnapshot.ui.messageModelOverride) {
+        dispatch(setMessageModelOverride(null));
       }
 
       // Re-read state: the routing update above may have changed selectedModelByRole.chat

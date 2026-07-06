@@ -1,5 +1,10 @@
 import { act, screen, waitFor } from "@testing-library/react";
-import { addAndSelectMockLlm } from "../../../util/test/config";
+import { vi } from "vitest";
+import { ACTIVE_FILE_POLL_MS } from "../../../components/mainInput/ContextInspectorPanel";
+import {
+  addAndSelectMockLlm,
+  triggerConfigUpdate,
+} from "../../../util/test/config";
 import { renderWithProviders } from "../../../util/test/render";
 import {
   getElementByTestId,
@@ -148,7 +153,11 @@ describe("Context inspector panel", () => {
     });
 
     const warning = await getElementByTestId("context-inspector-token-warning");
-    expect(warning.textContent).toMatch(/~6000 tokens/);
+    // Comma-grouped, matching the hard-limit warning's "8,000" formatting.
+    expect(warning.textContent).toMatch(/~6,000 tokens/);
+    // The soft warning must read as milder than the over-limit warning
+    // below, not use the identical color (see the over-limit test).
+    expect(warning.className).toContain("text-warning");
     expect(
       screen.queryByTestId("context-inspector-over-limit-warning"),
     ).not.toBeInTheDocument();
@@ -194,6 +203,11 @@ describe("Context inspector panel", () => {
     );
     expect(warning.textContent).toMatch(/over the 8,000 token limit/);
     expect(warning.textContent).toMatch(/1 item/);
+    // This is the more severe state (items get silently dropped) - it must
+    // be visually distinct from the softer "consider trimming" warning,
+    // which uses text-warning.
+    expect(warning.className).toContain("text-error");
+    expect(warning.className).not.toContain("text-warning");
 
     await sendInputWithMockedResponse(ideMessenger, "hello", [
       { role: "assistant", content: "hi" },
@@ -204,5 +218,196 @@ describe("Context inspector panel", () => {
       (item) => item.name,
     );
     expect(keptNames).toEqual(["a.ts"]);
+  });
+
+  it("never previews @codebase (avoids triggering a reindex on every keystroke/poll), but still resolves it at actual send time", async () => {
+    const { ideMessenger, store } = await renderWithProviders(<Chat />);
+    addAndSelectMockLlm(store, ideMessenger);
+    const requestSpy = vi.spyOn(ideMessenger, "request");
+    ideMessenger.responseHandlers["context/getContextItems"] = async ({
+      name,
+    }) =>
+      name === "codebase"
+        ? [
+            {
+              id: { providerTitle: "codebase", itemId: "does-not-matter" },
+              name: "Codebase results",
+              description: "3 relevant files",
+              content: "x".repeat(40),
+            },
+          ]
+        : [];
+
+    const editor = await getMainEditor();
+    await act(async () => {
+      editor.commands.insertContent([
+        {
+          type: "mention",
+          attrs: {
+            id: "codebase",
+            label: "codebase",
+            itemType: "contextProvider",
+            query: "",
+          },
+        },
+      ]);
+    });
+
+    // Give the debounced preview + at least one poll tick a chance to fire.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const previewCodebaseCalls = requestSpy.mock.calls.filter(
+      ([type, data]) =>
+        type === "context/getContextItems" &&
+        (data as any)?.name === "codebase",
+    );
+    expect(previewCodebaseCalls).toHaveLength(0);
+
+    await sendInputWithMockedResponse(ideMessenger, "hello", [
+      { role: "assistant", content: "hi" },
+    ]);
+
+    const sendCodebaseCalls = requestSpy.mock.calls.filter(
+      ([type, data]) =>
+        type === "context/getContextItems" &&
+        (data as any)?.name === "codebase",
+    );
+    expect(sendCodebaseCalls.length).toBeGreaterThan(0);
+
+    const userHistoryItem = store.getState().session.history.at(-2);
+    expect(
+      (userHistoryItem?.contextItems ?? []).map((item) => item.name),
+    ).toContain("Codebase results");
+  });
+
+  it("explains why the first @codebase use is slow instead of silently looking hung", async () => {
+    const { ideMessenger, store } = await renderWithProviders(<Chat />);
+    addAndSelectMockLlm(store, ideMessenger);
+
+    const editor = await getMainEditor();
+    await act(async () => {
+      editor.commands.insertContent([
+        {
+          type: "mention",
+          attrs: {
+            id: "codebase",
+            label: "codebase",
+            itemType: "contextProvider",
+            query: "",
+          },
+        },
+      ]);
+    });
+
+    // No notice yet - core hasn't reported an in-progress build.
+    expect(
+      screen.queryByTestId("context-inspector-codebase-indexing-notice"),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      ideMessenger.mockMessageToWebview("indexProgress", {
+        progress: 0.4,
+        desc: "Indexing repository",
+        status: "indexing",
+      });
+    });
+
+    const notice = await getElementByTestId(
+      "context-inspector-codebase-indexing-notice",
+    );
+    expect(notice.textContent).toMatch(/first time/);
+
+    await act(async () => {
+      ideMessenger.mockMessageToWebview("indexProgress", {
+        progress: 1,
+        desc: "Indexing complete",
+        status: "done",
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("context-inspector-codebase-indexing-notice"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("active-file poll (regression: shouldn't run forever while idle)", () => {
+    const originalVisibilityState = Object.getOwnPropertyDescriptor(
+      document,
+      "visibilityState",
+    );
+
+    function setVisibility(state: "visible" | "hidden") {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => state,
+      });
+    }
+
+    afterEach(() => {
+      if (originalVisibilityState) {
+        Object.defineProperty(
+          document,
+          "visibilityState",
+          originalVisibilityState,
+        );
+      }
+    });
+
+    it("stops polling while the webview is hidden, and refreshes immediately on regaining visibility", async () => {
+      const { ideMessenger, store } = await renderWithProviders(<Chat />);
+      addAndSelectMockLlm(store, ideMessenger);
+      // selectUseActiveFile reads experimental.defaultContext for the
+      // literal string "activeFile" - force that shape directly since
+      // nothing in the app actually sets it this way (see the note in the
+      // fix report: this looks like a separate, pre-existing dead selector).
+      await act(async () => {
+        triggerConfigUpdate({
+          store,
+          ideMessenger,
+          editConfig: (current) => {
+            current.experimental = {
+              ...current.experimental,
+              defaultContext: ["activeFile"] as any,
+            };
+            return current;
+          },
+        });
+      });
+      const requestSpy = vi.spyOn(ideMessenger, "request");
+
+      // Let the initial preview resolve settle before measuring.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const callsBeforeHidden = requestSpy.mock.calls.filter(
+        ([type]) => type === "context/getContextItems",
+      ).length;
+
+      setVisibility("hidden");
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      // Wait past a full poll interval - no new resolution should fire.
+      await new Promise((resolve) =>
+        setTimeout(resolve, ACTIVE_FILE_POLL_MS + 300),
+      );
+      const callsWhileHidden = requestSpy.mock.calls.filter(
+        ([type]) => type === "context/getContextItems",
+      ).length;
+      expect(callsWhileHidden).toBe(callsBeforeHidden);
+
+      setVisibility("visible");
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      await waitFor(() => {
+        const callsAfterVisible = requestSpy.mock.calls.filter(
+          ([type]) => type === "context/getContextItems",
+        ).length;
+        expect(callsAfterVisible).toBeGreaterThan(callsWhileHidden);
+      });
+    });
   });
 });

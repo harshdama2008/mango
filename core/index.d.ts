@@ -437,6 +437,29 @@ export interface CostDashboardEvent {
   completionTokens: number;
   /** 0 when the model isn't in the hardcoded pricing table */
   cost: number;
+  /**
+   * False when the model has no entry in the hardcoded pricing table, in
+   * which case `cost` is a placeholder 0 rather than a real (possibly
+   * genuinely free) price. Lets the UI say "N responses" instead of the
+   * self-contradictory "N priced responses - $0.00".
+   */
+  isPriced: boolean;
+  /**
+   * Index of the assistant history item this response belongs to - stable
+   * across a regenerate/edit of the same turn (see submitEditorAndInitAtIndex),
+   * used together with startOfTurn to avoid double-counting cost when a
+   * response is regenerated rather than genuinely a new turn.
+   */
+  historySlotIndex: number;
+  /**
+   * True only for the first recorded event of a fresh response at this slot
+   * (i.e. before any promptLogs existed on it). Tells the storage layer to
+   * discard prior events for this sessionId+historySlotIndex before adding
+   * this one, since a regenerate reuses the same slot. Follow-up events for
+   * the same in-progress turn (e.g. additional tool-call round trips) pass
+   * false and accumulate instead of replacing.
+   */
+  startOfTurn: boolean;
 }
 
 export interface AssistantChatMessage {

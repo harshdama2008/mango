@@ -10,6 +10,20 @@ function formatDate(timestamp: number): string {
   });
 }
 
+function describeResponseCount(
+  messageCount: number,
+  pricedMessageCount: number,
+): string {
+  const responseWord = messageCount === 1 ? "response" : "responses";
+  if (pricedMessageCount === messageCount) {
+    return `${messageCount} priced ${responseWord}`;
+  }
+  if (pricedMessageCount === 0) {
+    return `${messageCount} ${responseWord} (no pricing data)`;
+  }
+  return `${messageCount} ${responseWord} (${pricedMessageCount} priced)`;
+}
+
 export function SessionRow({
   session,
   highlighted,
@@ -34,8 +48,11 @@ export function SessionRow({
           )}
         </span>
         <span className="text-description-muted text-xs">
-          {formatDate(session.lastActivity)} · {session.messageCount} priced{" "}
-          {session.messageCount === 1 ? "response" : "responses"}
+          {formatDate(session.lastActivity)} ·{" "}
+          {describeResponseCount(
+            session.messageCount,
+            session.pricedMessageCount,
+          )}
         </span>
       </div>
       <span className="shrink-0 text-sm font-semibold">

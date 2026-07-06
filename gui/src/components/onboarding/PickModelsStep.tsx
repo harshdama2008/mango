@@ -10,6 +10,7 @@ interface PickModelsStepProps {
   onPowerfulChange: (key: string) => void;
   onBack: () => void;
   onComplete: () => void;
+  isCompleting?: boolean;
 }
 
 export function PickModelsStep({
@@ -20,9 +21,10 @@ export function PickModelsStep({
   onPowerfulChange,
   onBack,
   onComplete,
+  isCompleting,
 }: PickModelsStepProps) {
   const { everyday, powerful } = getModelOptionsForProvider(provider.id);
-  const canComplete = !!everydayKey && !!powerfulKey;
+  const canComplete = !!everydayKey && !!powerfulKey && !isCompleting;
 
   return (
     <div>
@@ -71,7 +73,12 @@ export function PickModelsStep({
       </div>
 
       <div className="mt-6 flex items-center justify-between">
-        <Button type="button" onClick={onBack} className="bg-transparent">
+        <Button
+          type="button"
+          onClick={onBack}
+          className="bg-transparent"
+          disabled={isCompleting}
+        >
           Back
         </Button>
         <Button
@@ -80,7 +87,7 @@ export function PickModelsStep({
           onClick={onComplete}
           disabled={!canComplete}
         >
-          Start coding
+          {isCompleting ? "Starting..." : "Start coding"}
         </Button>
       </div>
     </div>

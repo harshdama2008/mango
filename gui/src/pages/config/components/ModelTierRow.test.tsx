@@ -30,9 +30,13 @@ function configuredModel(
 function renderRow({
   selectedKey = null,
   configuredModels = [],
+  role = "autocomplete" as const,
+  autoApplyAsSelected,
 }: {
   selectedKey?: string | null;
   configuredModels?: ModelDescription[];
+  role?: "autocomplete" | "chat";
+  autoApplyAsSelected?: boolean;
 } = {}) {
   const ideMessenger = new MockIdeMessenger();
 
@@ -59,7 +63,7 @@ function renderRow({
           ...EMPTY_CONFIG,
           modelsByRole: {
             ...EMPTY_CONFIG.modelsByRole,
-            autocomplete: configuredModels,
+            [role]: configuredModels,
           },
         },
       },
@@ -75,10 +79,11 @@ function renderRow({
           <ModelTierRow
             title="Everyday Model"
             description="A fast, low-cost model used for autocomplete and simple questions"
-            role="autocomplete"
+            role={role}
             options={EVERYDAY_MODEL_OPTIONS}
             selectedKey={selectedKey}
             onSelectKey={onSelectKey}
+            autoApplyAsSelected={autoApplyAsSelected}
           />
         </AuthProvider>
       </IdeMessengerProvider>
@@ -170,5 +175,26 @@ describe("ModelTierRow", () => {
         store.getState().config.config.selectedModelByRole.autocomplete?.title,
       ).toBe("Freshly Added Haiku");
     });
+  });
+
+  it("does not apply as the selected model when autoApplyAsSelected is false, but still shows the configured status", async () => {
+    const { store } = renderRow({
+      selectedKey: "claude-haiku",
+      role: "chat",
+      autoApplyAsSelected: false,
+      configuredModels: [
+        configuredModel({
+          title: "My Claude Haiku",
+          provider: "anthropic",
+          model: "claude-haiku-4-5-20251001",
+        }),
+      ],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Using My Claude Haiku/)).toBeInTheDocument();
+    });
+
+    expect(store.getState().config.config.selectedModelByRole.chat).toBeNull();
   });
 });

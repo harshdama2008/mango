@@ -1,5 +1,7 @@
 import { act, screen, waitFor } from "@testing-library/react";
-import { setMode } from "../../../redux/slices/sessionSlice";
+import { vi } from "vitest";
+import { setCodeToEdit } from "../../../redux/slices/editState";
+import { setIsInEdit, setMode } from "../../../redux/slices/sessionSlice";
 import {
   setEverydayModelKey,
   setPowerfulModelKey,
@@ -63,6 +65,17 @@ describe("Everyday/Powerful automatic model routing", () => {
     expect(store.getState().config.config.selectedModelByRole.chat?.title).toBe(
       EVERYDAY_MODEL.title,
     );
+  });
+
+  it("doesn't repeat the resolved model's title inline (ModelSelect already shows it, and long titles can overflow the toolbar)", async () => {
+    const { ideMessenger, store } = await renderWithProviders(<Chat />);
+    await setupTierModels(store, ideMessenger);
+
+    const indicator = await getElementByTestId("model-routing-indicator");
+    await waitFor(() => {
+      expect(indicator.textContent).toMatch(/Everyday/);
+    });
+    expect(indicator.textContent).not.toContain(EVERYDAY_MODEL.title);
   });
 
   it("routes a long chat message (>200 chars) to the Powerful Model", async () => {
@@ -130,6 +143,44 @@ describe("Everyday/Powerful automatic model routing", () => {
     );
   });
 
+  it("keeps the indicator's preview consistent with the actual routing decision for a mention-heavy message", async () => {
+    const { ideMessenger, store } = await renderWithProviders(<Chat />);
+    await setupTierModels(store, ideMessenger);
+
+    const editor = await getMainEditor();
+    // The typed text alone is short, but the mention's label pushes the
+    // message over 200 characters once counted the way sendInput counts it -
+    // the indicator must agree, not just show "Everyday" and then actually
+    // route to Powerful once sent.
+    await act(async () => {
+      editor.commands.insertContent([
+        {
+          type: "mention",
+          attrs: {
+            id: "file:///a.ts",
+            label: "a".repeat(210),
+            itemType: "file",
+          },
+        },
+      ]);
+    });
+
+    const indicator = await getElementByTestId("model-routing-indicator");
+    await waitFor(() => {
+      expect(indicator.textContent).toMatch(/Powerful/);
+    });
+
+    ideMessenger.chatResponse = [{ role: "assistant", content: "hello" }];
+    const sendButton = await getElementByTestId("submit-input-button");
+    await act(async () => {
+      sendButton.click();
+    });
+
+    expect(store.getState().config.config.selectedModelByRole.chat?.title).toBe(
+      POWERFUL_MODEL.title,
+    );
+  });
+
   it("lets the user manually override routing for a single message via the indicator", async () => {
     const { ideMessenger, store } = await renderWithProviders(<Chat />);
     await setupTierModels(store, ideMessenger);
@@ -166,5 +217,102 @@ describe("Everyday/Powerful automatic model routing", () => {
         /Everyday/,
       );
     });
+  });
+
+  it("clears a manual override on an Edit-mode send too, so it doesn't leak into the next chat message", async () => {
+    const { ideMessenger, store } = await renderWithProviders(<Chat />);
+    await setupTierModels(store, ideMessenger);
+    ideMessenger.responses["edit/sendPrompt"] = undefined;
+
+    // Set an override while still in chat mode.
+    const indicator = await getElementByTestId("model-routing-indicator");
+    await waitFor(() => {
+      expect(indicator.textContent).toMatch(/Everyday/);
+    });
+    await act(async () => {
+      indicator.click();
+    });
+    await waitFor(() => {
+      expect(store.getState().ui.messageModelOverride).not.toBeNull();
+    });
+
+    // Switch to Edit mode (the override-clearing logic used to live inside
+    // an "only if not in Edit mode" branch, so it never ran for these sends)
+    // and send.
+    await act(async () => {
+      store.dispatch(setIsInEdit(true));
+      store.dispatch(
+        setCodeToEdit({
+          codeToEdit: { filepath: "file:///a.ts", contents: "const a = 1;" },
+        }),
+      );
+    });
+
+    const editor = await getMainEditor();
+    await act(async () => {
+      editor.commands.insertContent("edit this");
+    });
+    const sendButton = await getElementByTestId("submit-input-button");
+    await act(async () => {
+      sendButton.click();
+    });
+
+    await waitFor(() => {
+      expect(store.getState().ui.messageModelOverride).toBeNull();
+    });
+  });
+
+  it("visibly warns when overriding downgrades a mode-forced agent task to Everyday", async () => {
+    const { ideMessenger, store } = await renderWithProviders(<Chat />);
+    await setupTierModels(store, ideMessenger);
+    await act(async () => {
+      store.dispatch(setMode("agent"));
+    });
+
+    const indicator = await getElementByTestId("model-routing-indicator");
+    await waitFor(() => {
+      expect(indicator.textContent).toMatch(/Powerful/);
+    });
+    expect(
+      screen.queryByTestId("model-routing-override-warning"),
+    ).not.toBeInTheDocument();
+
+    // Overriding agent mode's forced Powerful down to Everyday should be
+    // visibly flagged, not silent.
+    await act(async () => {
+      indicator.click();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("model-routing-indicator").textContent).toMatch(
+        /Everyday/,
+      );
+    });
+    expect(
+      screen.getByTestId("model-routing-override-warning"),
+    ).toBeInTheDocument();
+  });
+
+  it("switches the active chat model in-session without persisting the change to config.yaml", async () => {
+    const { ideMessenger, store } = await renderWithProviders(<Chat />);
+    await setupTierModels(store, ideMessenger);
+    const postSpy = vi.spyOn(ideMessenger, "post");
+
+    const longMessage = "x".repeat(201);
+    await sendInputWithMockedResponse(ideMessenger, longMessage, [
+      { role: "assistant", content: "hello" },
+    ]);
+
+    // Routing did switch the in-session active model...
+    expect(store.getState().config.config.selectedModelByRole.chat?.title).toBe(
+      POWERFUL_MODEL.title,
+    );
+
+    // ...but it must not have written that switch back to config.yaml - only
+    // an explicit user pick (e.g. the model dropdown) should persist.
+    const persistedSelectionCalls = postSpy.mock.calls.filter(
+      ([type]) => type === "config/updateSelectedModel",
+    );
+    expect(persistedSelectionCalls).toHaveLength(0);
   });
 });

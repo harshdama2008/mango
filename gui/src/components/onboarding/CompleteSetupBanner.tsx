@@ -25,7 +25,9 @@ export function CompleteSetupBanner() {
       data-testid="complete-setup-banner"
       className="border-vsc-input-border bg-vsc-input-background mb-2 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
     >
-      <span>Finish setting up Mango to start coding.</span>
+      <span>
+        No model is configured yet - chat won't work until you finish setup.
+      </span>
       <Button
         type="button"
         data-testid="complete-setup-banner-button"

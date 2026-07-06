@@ -18,6 +18,15 @@ export interface ModelTierRowProps {
   options: RecommendedModel[];
   selectedKey: string | null;
   onSelectKey: (key: string) => void;
+  /**
+   * Whether finding a configured match for this tier should also make it the
+   * persisted `selectedModelByRole[role]`. Both the Everyday and Powerful
+   * rows check role="chat" (matching what automatic routing reads - see
+   * Chat.tsx's sendInput), since that's the only role routing resolves
+   * against. But only one row can own "the persisted default chat model" or
+   * they'd fight over it on every mount. Defaults to true.
+   */
+  autoApplyAsSelected?: boolean;
 }
 
 // Models added via ModelTierRow should work everywhere (autocomplete, chat,
@@ -41,6 +50,7 @@ export function ModelTierRow({
   options,
   selectedKey,
   onSelectKey,
+  autoApplyAsSelected = true,
 }: ModelTierRowProps) {
   const dispatch = useAppDispatch();
   const { selectedProfile } = useAuth();
@@ -58,6 +68,9 @@ export function ModelTierRow({
     : undefined;
 
   function applyMatch(matchTitle: string) {
+    if (!autoApplyAsSelected) {
+      return;
+    }
     void dispatch(
       updateSelectedModelByRole({
         role,
@@ -71,7 +84,11 @@ export function ModelTierRow({
   // user just added the API key) and it isn't already the active model for
   // this role, apply it automatically.
   useEffect(() => {
-    if (configuredMatch && activeModel?.title !== configuredMatch.title) {
+    if (
+      autoApplyAsSelected &&
+      configuredMatch &&
+      activeModel?.title !== configuredMatch.title
+    ) {
       applyMatch(configuredMatch.title);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

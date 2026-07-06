@@ -380,6 +380,10 @@ describe("streamResponseThunk", () => {
         payload: undefined,
       },
       {
+        type: "session/updateSessionTitle",
+        payload: "Hello",
+      },
+      {
         type: "session/update/pending",
         meta: {
           arg: expect.objectContaining({

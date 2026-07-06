@@ -76,19 +76,25 @@ export function calculateRequestCost(
     return null;
   }
 
-  const inputCost = (usage.promptTokens / 1_000_000) * pricing.input;
-  const outputCost = (usage.completionTokens / 1_000_000) * pricing.output;
+  // Some providers omit a usage field entirely rather than sending 0 - guard
+  // against that here so it can't turn into NaN and render as the literal
+  // text "$NaN" in the cost UI.
+  const promptTokens = usage.promptTokens ?? 0;
+  const completionTokens = usage.completionTokens ?? 0;
+
+  const inputCost = (promptTokens / 1_000_000) * pricing.input;
+  const outputCost = (completionTokens / 1_000_000) * pricing.output;
   const totalCost = inputCost + outputCost;
 
   const breakdownParts: string[] = [];
-  if (usage.promptTokens > 0) {
+  if (promptTokens > 0) {
     breakdownParts.push(
-      `Input: ${usage.promptTokens.toLocaleString()} tokens × $${pricing.input}/MTok = $${inputCost.toFixed(6)}`,
+      `Input: ${promptTokens.toLocaleString()} tokens × $${pricing.input}/MTok = $${inputCost.toFixed(6)}`,
     );
   }
-  if (usage.completionTokens > 0) {
+  if (completionTokens > 0) {
     breakdownParts.push(
-      `Output: ${usage.completionTokens.toLocaleString()} tokens × $${pricing.output}/MTok = $${outputCost.toFixed(6)}`,
+      `Output: ${completionTokens.toLocaleString()} tokens × $${pricing.output}/MTok = $${outputCost.toFixed(6)}`,
     );
   }
 

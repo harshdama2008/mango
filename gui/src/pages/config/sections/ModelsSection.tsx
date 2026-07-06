@@ -94,10 +94,15 @@ export function ModelsSection() {
         <ModelTierRow
           title="Everyday Model"
           description="A fast, low-cost model used for autocomplete and simple questions"
-          role="autocomplete"
+          role="chat"
           options={EVERYDAY_MODEL_OPTIONS}
           selectedKey={everydayModelKey}
           onSelectKey={(key) => dispatch(setEverydayModelKey(key))}
+          // Both rows check role="chat" to match what automatic routing
+          // reads, but only the Powerful row should own the persisted
+          // default selected chat model - otherwise the two rows would
+          // fight over it every time both are configured.
+          autoApplyAsSelected={false}
         />
 
         <Divider />

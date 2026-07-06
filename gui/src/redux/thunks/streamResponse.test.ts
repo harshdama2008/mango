@@ -288,6 +288,10 @@ describe("streamResponseThunk", () => {
         payload: undefined,
       },
       {
+        type: "session/updateSessionTitle",
+        payload: "Session summary",
+      },
+      {
         type: "session/update/pending",
         meta: expect.objectContaining({
           requestStatus: "pending",
@@ -611,6 +615,7 @@ describe("streamResponseThunk", () => {
       "session/setInactive",
       "chat/streamNormalInput/fulfilled",
       "session/saveCurrent/pending",
+      "session/updateSessionTitle",
       "session/update/pending",
       "session/updateSessionMetadata",
       "session/refreshMetadata/pending",
@@ -1066,6 +1071,10 @@ describe("streamResponseThunk", () => {
           requestStatus: "pending",
         },
         payload: undefined,
+      },
+      {
+        type: "session/updateSessionTitle",
+        payload: "Session summary",
       },
       {
         type: "session/update/pending",

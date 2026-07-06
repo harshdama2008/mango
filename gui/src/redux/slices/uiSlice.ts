@@ -8,6 +8,7 @@ import {
 } from "../../components/OnboardingCard";
 import { ModelTier } from "../../util/modelRouting";
 import { getLocalStorage, LocalStorageKey } from "../../util/localStorage";
+import { newSession } from "./sessionSlice";
 
 export type RulePolicy = "on" | "off";
 
@@ -42,7 +43,8 @@ type UIState = {
   /**
    * Keys (see util/contextItemKey.ts) of context items excluded via the
    * context inspector panel's X button, for the NEXT message only. Cleared
-   * after every send (not persisted).
+   * after every send, and also on newSession (new/loaded/restored session)
+   * so an exclusion never leaks into a different session (not persisted).
    */
   excludedContextItemKeys: string[];
 };
@@ -189,6 +191,15 @@ export const uiSlice = createSlice({
     clearExcludedContextItemKeys: (state) => {
       state.excludedContextItemKeys = [];
     },
+  },
+  extraReducers: (builder) => {
+    // A per-message exclusion is meaningless once the session it was set in
+    // is gone - without this, excluding an item and then switching/loading a
+    // session (without sending) leaks the exclusion into the new session and
+    // permanently blocks re-mentioning that item there.
+    builder.addCase(newSession, (state) => {
+      state.excludedContextItemKeys = [];
+    });
   },
 });
 

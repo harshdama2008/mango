@@ -11,6 +11,7 @@ import {
   setAllSessionMetadata,
   setIsSessionMetadataLoading,
   updateSessionMetadata,
+  updateSessionTitle,
 } from "../slices/sessionSlice";
 import { ThunkApiType } from "../store";
 import { updateSelectedModelByRole } from "../thunks/updateSelectedModelByRole";
@@ -245,6 +246,13 @@ export const saveCurrentSession = createAsyncThunk<
     }
     if (!title.length) {
       title = NEW_SESSION_TITLE;
+    }
+
+    // Reflect the generated title in redux, not just on disk - the cost
+    // dashboard middleware reads state.session.title at record time, so
+    // without this every session appears there as "New Session" forever.
+    if (title !== session.title && getState().session.id === session.id) {
+      dispatch(updateSessionTitle(title));
     }
 
     const updatedSession: Session = {

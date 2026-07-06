@@ -15,6 +15,14 @@ export interface RoutingDecision {
   tier: ModelTier;
   /** Human-readable explanation, shown in the indicator's tooltip */
   reason: string;
+  /**
+   * True when the tier was forced by the session mode (agent/plan/background),
+   * rather than by message length. Overriding away from a mode-forced tier
+   * (e.g. forcing an agent task onto the Everyday Model) is more likely to be
+   * a mistake than overriding a plain chat message, so the UI should call
+   * this out rather than silently honoring it.
+   */
+  isModeForced: boolean;
 }
 
 /**
@@ -37,6 +45,7 @@ export function computeAutoRoutedTier(input: RoutingInput): RoutingDecision {
         input.mode === "agent"
           ? "Agent mode always uses the Powerful Model"
           : "This mode always uses the Powerful Model",
+      isModeForced: true,
     };
   }
 
@@ -44,6 +53,7 @@ export function computeAutoRoutedTier(input: RoutingInput): RoutingDecision {
     return {
       tier: "powerful",
       reason: `Multi-file edits always use the Powerful Model (${input.attachedFileCount} files attached)`,
+      isModeForced: false,
     };
   }
 
@@ -51,11 +61,13 @@ export function computeAutoRoutedTier(input: RoutingInput): RoutingDecision {
     return {
       tier: "powerful",
       reason: `Messages over ${SIMPLE_MESSAGE_CHAR_LIMIT} characters use the Powerful Model`,
+      isModeForced: false,
     };
   }
 
   return {
     tier: "everyday",
     reason: `Messages under ${SIMPLE_MESSAGE_CHAR_LIMIT} characters use the Everyday Model`,
+    isModeForced: false,
   };
 }

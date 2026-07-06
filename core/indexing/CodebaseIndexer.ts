@@ -862,7 +862,13 @@ export class CodebaseIndexer {
         return;
       }
 
-      if (needsReindex) {
+      // Conservative default: don't build the codebase index eagerly on
+      // config load/update either - wait for the user to explicitly invoke
+      // @codebase (core.ts's getContextItems) or manually re-index from
+      // settings. Without this check, any user with an embed model already
+      // configured would still get eager indexing here, bypassing the same
+      // gate applied to core.ts's other indexing triggers.
+      if (needsReindex && this.indexingExplicitlyRequested) {
         const dirs = await this.ide.getWorkspaceDirs();
         void this.refreshCodebaseIndex(dirs);
       }

@@ -6,6 +6,7 @@ import {
   setSelectedProfile,
 } from "../../../redux/slices/profilesSlice";
 import { getModelOptionsForProvider } from "../../../util/recommendedModels";
+import { addAndSelectChatModel } from "../../../util/test/config";
 import { renderWithProviders } from "../../../util/test/render";
 import { getElementByTestId } from "../../../util/test/utils";
 import { Chat } from "../Chat";
@@ -47,6 +48,17 @@ describe("First-run onboarding wizard", () => {
     for (const provider of ONBOARDING_PROVIDERS) {
       await getElementByTestId(`onboarding-provider-${provider.id}`);
     }
+  });
+
+  it("has only one way to dismiss the wizard - the labeled 'Skip for now' link, not a redundant icon-only close button", async () => {
+    await renderWithProviders(<Chat />);
+    const wizard = await getElementByTestId("onboarding-wizard");
+
+    expect(screen.getByTestId("onboarding-skip")).toBeInTheDocument();
+    const iconOnlyButtons = Array.from(
+      wizard.querySelectorAll("button"),
+    ).filter((btn) => btn.textContent?.trim() === "");
+    expect(iconOnlyButtons).toHaveLength(0);
   });
 
   describe("(1) each provider button shows the right step 2", () => {
@@ -129,6 +141,64 @@ describe("First-run onboarding wizard", () => {
       const continueButton = await getElementByTestId(
         "onboarding-connect-continue",
       );
+      expect(continueButton).not.toBeDisabled();
+    });
+
+    it("shows an error instead of getting stuck on 'Testing…' when the request itself fails", async () => {
+      // Regression: the cloud-provider test path had no try/catch (unlike
+      // the Ollama path below), so a rejected request left the button
+      // disabled on "Testing…" forever with no feedback.
+      const { ideMessenger } = await renderWithProviders(<Chat />);
+      ideMessenger.responseHandlers["llm/testConnection"] = async () => {
+        throw new Error("core did not respond");
+      };
+
+      await goToStep2("anthropic");
+      const apiKeyInput = await getElementByTestId("onboarding-api-key-input");
+      await act(async () => {
+        fireEvent.change(apiKeyInput, { target: { value: "sk-test-key" } });
+      });
+      const testButton = await getElementByTestId("onboarding-test-connection");
+      await act(async () => {
+        testButton.click();
+      });
+
+      const error = await getElementByTestId("onboarding-test-error");
+      expect(error.textContent).toContain("Connection test failed");
+      expect(testButton).not.toBeDisabled();
+      expect(testButton.textContent).not.toMatch(/Testing/);
+    });
+
+    it("disables Continue while a test is in flight, so advancing can't unmount ConnectStep before the response arrives", async () => {
+      const { ideMessenger } = await renderWithProviders(<Chat />);
+      let resolveTest: (result: {
+        success: boolean;
+        message: string;
+      }) => void = () => {};
+      ideMessenger.responseHandlers["llm/testConnection"] = () =>
+        new Promise((resolve) => {
+          resolveTest = resolve;
+        });
+
+      await goToStep2("anthropic");
+      const apiKeyInput = await getElementByTestId("onboarding-api-key-input");
+      await act(async () => {
+        fireEvent.change(apiKeyInput, { target: { value: "sk-test-key" } });
+      });
+      const testButton = await getElementByTestId("onboarding-test-connection");
+      const continueButton = await getElementByTestId(
+        "onboarding-connect-continue",
+      );
+      expect(continueButton).not.toBeDisabled();
+
+      await act(async () => {
+        testButton.click();
+      });
+      expect(continueButton).toBeDisabled();
+
+      await act(async () => {
+        resolveTest({ success: true, message: "Connection successful" });
+      });
       expect(continueButton).not.toBeDisabled();
     });
   });
@@ -214,6 +284,128 @@ describe("First-run onboarding wizard", () => {
     }
   });
 
+  describe("single-option dropdowns are preselected (regression)", () => {
+    for (const provider of ONBOARDING_PROVIDERS) {
+      it(`preselects ${provider.id}'s sole everyday + powerful model, so "Start coding" doesn't require a pointless manual pick`, async () => {
+        const { ideMessenger } = await renderWithProviders(<Chat />);
+        await goToStep3(provider.id, ideMessenger);
+
+        const { everyday, powerful } = getModelOptionsForProvider(provider.id);
+
+        const everydaySelect = (await getElementByTestId(
+          "onboarding-everyday-select",
+        )) as HTMLSelectElement;
+        const powerfulSelect = (await getElementByTestId(
+          "onboarding-powerful-select",
+        )) as HTMLSelectElement;
+
+        expect(everydaySelect.value).toBe(everyday[0].key);
+        expect(powerfulSelect.value).toBe(powerful[0].key);
+
+        const startButton = await getElementByTestId("onboarding-start-coding");
+        expect(startButton).not.toBeDisabled();
+      });
+    }
+  });
+
+  describe("provider switching resets stale state (regression)", () => {
+    it("clears the API key and model selections when the user goes back and picks a different provider", async () => {
+      const { ideMessenger, store } = await renderWithProviders(<Chat />);
+      ideMessenger.responses["config/addModel"] = undefined;
+      ideMessenger.responses["config/updateSelectedModel"] = undefined;
+      const requestSpy = vi.spyOn(ideMessenger, "request");
+      store.dispatch(
+        setProfiles([
+          {
+            title: "Main Config",
+            id: "local",
+            errors: [],
+            uri: "",
+            iconUrl: "",
+          },
+        ]),
+      );
+      store.dispatch(setSelectedProfile("local"));
+
+      // Pick Anthropic, fill in a key, and select both tiers.
+      await goToStep3("anthropic", ideMessenger);
+      const everydaySelect = await getElementByTestId(
+        "onboarding-everyday-select",
+      );
+      const powerfulSelect = await getElementByTestId(
+        "onboarding-powerful-select",
+      );
+      await act(async () => {
+        fireEvent.change(everydaySelect, { target: { value: "claude-haiku" } });
+        fireEvent.change(powerfulSelect, {
+          target: { value: "claude-sonnet" },
+        });
+      });
+
+      // Go back to step 1 and pick a different provider.
+      await act(async () => {
+        screen.getByText("Back").click();
+      });
+      await act(async () => {
+        screen.getByText("Back").click();
+      });
+      await goToStep3("openai", ideMessenger);
+
+      // The dropdowns should not carry over Anthropic's selections - OpenAI's
+      // own (sole) options get preselected instead, not the stale Anthropic
+      // ones, and "Start coding" is enabled since both tiers already have a
+      // selection.
+      const startButton = await getElementByTestId("onboarding-start-coding");
+      expect(startButton).not.toBeDisabled();
+      expect(
+        (
+          (await getElementByTestId(
+            "onboarding-everyday-select",
+          )) as HTMLSelectElement
+        ).value,
+      ).toBe("gpt-4o-mini");
+      expect(
+        (
+          (await getElementByTestId(
+            "onboarding-powerful-select",
+          )) as HTMLSelectElement
+        ).value,
+      ).toBe("gpt-4o");
+
+      // Completing onboarding for OpenAI should only ever add OpenAI models,
+      // never the abandoned Anthropic selection or its API key.
+      await act(async () => {
+        startButton.click();
+      });
+
+      // Completion waits for the chat model it just configured to actually
+      // land in redux before closing - simulate core's async "configUpdate"
+      // push (see the onboarding-completion-race fix) so it can proceed.
+      await act(async () => {
+        addAndSelectChatModel(store, ideMessenger, {
+          title: "GPT-4o mini",
+          provider: "openai",
+          model: "gpt-4o-mini",
+          underlyingProviderName: "openai",
+        });
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("onboarding-wizard"),
+        ).not.toBeInTheDocument();
+      });
+
+      const addModelCalls = requestSpy.mock.calls.filter(
+        ([type]) => type === "config/addModel",
+      );
+      expect(addModelCalls).toHaveLength(2);
+      for (const call of addModelCalls) {
+        expect((call[1] as any).model.provider).toBe("openai");
+      }
+    });
+  });
+
   describe("(5) chat is immediately ready to use after finishing", () => {
     it("adds both models, selects the everyday model as the active chat model, and saves tier keys", async () => {
       const { ideMessenger, store } = await renderWithProviders(<Chat />);
@@ -238,7 +430,9 @@ describe("First-run onboarding wizard", () => {
         store.dispatch(setSelectedProfile("local"));
       });
 
-      const postSpy = vi.spyOn(ideMessenger, "post");
+      ideMessenger.responses["config/addModel"] = undefined;
+      ideMessenger.responses["config/updateSelectedModel"] = undefined;
+      const requestSpy = vi.spyOn(ideMessenger, "request");
 
       await goToStep3("anthropic", ideMessenger);
 
@@ -260,13 +454,25 @@ describe("First-run onboarding wizard", () => {
         startButton.click();
       });
 
+      // Completion waits for the chat model it just configured to actually
+      // land in redux before closing - simulate core's async "configUpdate"
+      // push (see the onboarding-completion-race fix) so the wizard proceeds.
+      await act(async () => {
+        addAndSelectChatModel(store, ideMessenger, {
+          title: "Claude Haiku",
+          provider: "anthropic",
+          model: "claude-haiku-4-5-20251001",
+          underlyingProviderName: "anthropic",
+        });
+      });
+
       await waitFor(() => {
         expect(
           screen.queryByTestId("onboarding-wizard"),
         ).not.toBeInTheDocument();
       });
 
-      const addModelCalls = postSpy.mock.calls.filter(
+      const addModelCalls = requestSpy.mock.calls.filter(
         ([type]) => type === "config/addModel",
       );
       expect(addModelCalls).toHaveLength(2);
@@ -280,7 +486,7 @@ describe("First-run onboarding wizard", () => {
       // The everyday model becomes the initial active chat model so the very
       // first send doesn't hit "No chat model selected" - automatic routing
       // takes over from there based on message content.
-      const selectModelCalls = postSpy.mock.calls.filter(
+      const selectModelCalls = requestSpy.mock.calls.filter(
         ([type]) => type === "config/updateSelectedModel",
       );
       expect(selectModelCalls).toHaveLength(1);
@@ -293,6 +499,73 @@ describe("First-run onboarding wizard", () => {
       expect(store.getState().ui.everydayModelKey).toBe("claude-haiku");
       expect(store.getState().ui.powerfulModelKey).toBe("claude-sonnet");
       expect(localStorage.getItem("onboardingStatus")).toBe('"Completed"');
+    });
+  });
+
+  describe("completion race (regression): the wizard never closes into a config-not-ready state", () => {
+    it("stays open, with 'Start coding' disabled, until the configured chat model actually lands in redux", async () => {
+      const { ideMessenger, store } = await renderWithProviders(<Chat />);
+      ideMessenger.responses["config/addModel"] = undefined;
+      ideMessenger.responses["config/updateSelectedModel"] = undefined;
+      store.dispatch(
+        setProfiles([
+          {
+            title: "Main Config",
+            id: "local",
+            errors: [],
+            uri: "",
+            iconUrl: "",
+          },
+        ]),
+      );
+      store.dispatch(setSelectedProfile("local"));
+
+      await goToStep3("anthropic", ideMessenger);
+      const everydaySelect = await getElementByTestId(
+        "onboarding-everyday-select",
+      );
+      const powerfulSelect = await getElementByTestId(
+        "onboarding-powerful-select",
+      );
+      await act(async () => {
+        fireEvent.change(everydaySelect, { target: { value: "claude-haiku" } });
+        fireEvent.change(powerfulSelect, {
+          target: { value: "claude-sonnet" },
+        });
+      });
+
+      const startButton = await getElementByTestId("onboarding-start-coding");
+      await act(async () => {
+        startButton.click();
+      });
+
+      // Core hasn't pushed the configUpdate yet - the wizard must stay open
+      // and the button must show it's still working, not silently re-enable
+      // and let the user type into a chat with no model selected.
+      expect(screen.getByTestId("onboarding-wizard")).toBeInTheDocument();
+      expect(screen.getByText("Starting...")).toBeInTheDocument();
+      expect(
+        await getElementByTestId("onboarding-start-coding"),
+      ).toBeDisabled();
+
+      // Now simulate core's async config push landing.
+      await act(async () => {
+        addAndSelectChatModel(store, ideMessenger, {
+          title: "Claude Haiku",
+          provider: "anthropic",
+          model: "claude-haiku-4-5-20251001",
+          underlyingProviderName: "anthropic",
+        });
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("onboarding-wizard"),
+        ).not.toBeInTheDocument();
+      });
+      expect(
+        store.getState().config.config.selectedModelByRole.chat?.title,
+      ).toBe("Claude Haiku");
     });
   });
 
@@ -321,7 +594,10 @@ describe("First-run onboarding wizard", () => {
       expect(screen.queryByTestId("onboarding-wizard")).not.toBeInTheDocument();
     });
 
-    await getElementByTestId("complete-setup-banner");
+    const banner = await getElementByTestId("complete-setup-banner");
+    // The banner must say what's actually missing (no model configured, chat
+    // won't work) rather than reading like an optional nice-to-have.
+    expect(banner.textContent).toContain("No model is configured");
     expect(localStorage.getItem("onboardingStatus")).not.toBe('"Completed"');
   });
 

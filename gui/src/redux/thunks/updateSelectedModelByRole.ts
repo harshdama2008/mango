@@ -10,12 +10,20 @@ export const updateSelectedModelByRole = createAsyncThunk<
     role: ModelRole;
     modelTitle: string;
     selectedProfile: ProfileDescription | null;
+    /**
+     * Whether to write this selection to config.yaml (via config/updateSelectedModel)
+     * in addition to updating in-session redux state. Defaults to true for
+     * explicit user picks (e.g. the model dropdown). Automatic Everyday/Powerful
+     * routing passes false, since a per-message routing decision shouldn't
+     * overwrite the user's persisted model preference - see Chat.tsx's sendInput.
+     */
+    persist?: boolean;
   },
   ThunkApiType
 >(
   "config/updateSelectedModel",
   async (
-    { role, modelTitle, selectedProfile },
+    { role, modelTitle, selectedProfile, persist = true },
     { dispatch, extra, getState },
   ) => {
     if (!selectedProfile) {
@@ -49,10 +57,12 @@ export const updateSelectedModelByRole = createAsyncThunk<
       }),
     );
 
-    extra.ideMessenger.post("config/updateSelectedModel", {
-      role,
-      profileId: selectedProfile.id,
-      title: modelTitle,
-    });
+    if (persist) {
+      extra.ideMessenger.post("config/updateSelectedModel", {
+        role,
+        profileId: selectedProfile.id,
+        title: modelTitle,
+      });
+    }
   },
 );

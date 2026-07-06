@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { setMessageModelOverride } from "../../redux/slices/uiSlice";
-import { countDistinctAttachedFiles } from "../../util/countAttachedFiles";
+import {
+  countDistinctAttachedFiles,
+  getMessageTextLength,
+} from "../../util/countAttachedFiles";
 import { computeAutoRoutedTier, ModelTier } from "../../util/modelRouting";
 import { resolveModelForTier } from "../../util/recommendedModels";
 import { ToolTip } from "../gui/Tooltip";
@@ -39,8 +42,12 @@ export function ModelRoutingIndicator() {
     }
 
     const update = () => {
-      setMessageLength(mainEditor.getText().trim().length);
-      setAttachedFileCount(countDistinctAttachedFiles(mainEditor.getJSON()));
+      // Use the same measurement sendInput uses at actual send time (which
+      // counts mention labels too), so the preview never disagrees with
+      // what routing decision the send will actually make.
+      const editorState = mainEditor.getJSON();
+      setMessageLength(getMessageTextLength(editorState));
+      setAttachedFileCount(countDistinctAttachedFiles(editorState));
     };
 
     update();
@@ -75,9 +82,27 @@ export function ModelRoutingIndicator() {
     ? `Manually set to ${TIER_LABEL[override]} for this message. Click to use ${TIER_LABEL[otherTier]} instead.`
     : `${autoRouted.reason}. Click to override for this message.`;
 
+  // Overriding away from a mode-forced tier (e.g. downgrading an agent task
+  // to the Everyday Model) is easy to do by accident with a single click and
+  // easy to miss since it only shows up in a hover tooltip - call it out
+  // directly on the indicator instead of leaving it silent.
+  const isDowngradingModeForcedTask =
+    override !== null &&
+    autoRouted.isModeForced &&
+    override !== autoRouted.tier;
+
   const tooltipContent = (
     <div className="flex flex-col gap-1 text-left">
       <span>{reason}</span>
+      {resolvedModel && (
+        <span className="text-description-muted">{resolvedModel.title}</span>
+      )}
+      {isDowngradingModeForcedTask && (
+        <span className="text-warning">
+          ⚠ {autoRouted.reason.replace(/\.$/, "")} — this message will use{" "}
+          {TIER_LABEL[effectiveTier]} instead.
+        </span>
+      )}
       {!resolvedModel && (
         <span className="text-warning">
           No {TIER_LABEL[effectiveTier]} Model configured yet — set one in
@@ -92,13 +117,21 @@ export function ModelRoutingIndicator() {
       <div
         data-testid="model-routing-indicator"
         onClick={() => dispatch(setMessageModelOverride(otherTier))}
-        className="text-description hover:text-foreground flex cursor-pointer select-none items-center gap-1 whitespace-nowrap"
+        className={`flex cursor-pointer select-none items-center gap-1 whitespace-nowrap ${
+          isDowngradingModeForcedTask
+            ? "text-warning"
+            : "text-description hover:text-foreground"
+        }`}
       >
+        {isDowngradingModeForcedTask && (
+          <span data-testid="model-routing-override-warning">⚠</span>
+        )}
         <span>{TIER_ICON[effectiveTier]}</span>
-        <span>
-          {TIER_LABEL[effectiveTier]}
-          {resolvedModel ? `: ${resolvedModel.title}` : ""}
-        </span>
+        {/* The resolved model's title is shown in the tooltip, not here -
+            ModelSelect right next to this indicator already displays the
+            active chat model's name, so repeating it here just duplicates
+            it and risks overflowing the toolbar on a narrow panel. */}
+        <span>{TIER_LABEL[effectiveTier]}</span>
       </div>
     </ToolTip>
   );

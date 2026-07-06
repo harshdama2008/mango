@@ -287,6 +287,7 @@ describe("streamResponseThunk - tool calls", () => {
       "session/setInactive",
       "chat/streamNormalInput/fulfilled",
       "session/saveCurrent/pending",
+      "session/updateSessionTitle",
       "session/update/pending",
       "session/updateSessionMetadata",
       "session/refreshMetadata/pending",
@@ -818,6 +819,10 @@ describe("streamResponseThunk - tool calls", () => {
           requestStatus: "pending",
         },
         payload: undefined,
+      },
+      {
+        type: "session/updateSessionTitle",
+        payload: "Session summary",
       },
       {
         type: "session/update/pending",
@@ -1372,6 +1377,10 @@ describe("streamResponseThunk - tool calls", () => {
           requestStatus: "pending",
         },
         payload: undefined,
+      },
+      {
+        type: "session/updateSessionTitle",
+        payload: "Session summary",
       },
       {
         type: "session/update/pending",

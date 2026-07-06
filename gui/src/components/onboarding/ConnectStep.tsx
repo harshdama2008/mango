@@ -49,20 +49,28 @@ export function ConnectStep({
 
   async function handleTestCloudProvider() {
     setTestState("testing");
-    const result = await ideMessenger.request("llm/testConnection", {
-      provider: provider.id,
-      apiKey,
-    });
-    if (result.status === "success" && result.content.success) {
-      setTestState("success");
-      setTestMessage(result.content.message);
-    } else {
+    try {
+      const result = await ideMessenger.request("llm/testConnection", {
+        provider: provider.id,
+        apiKey,
+      });
+      if (result.status === "success" && result.content.success) {
+        setTestState("success");
+        setTestMessage(result.content.message);
+      } else {
+        setTestState("error");
+        setTestMessage(
+          result.status === "success"
+            ? result.content.message
+            : "Connection test failed.",
+        );
+      }
+    } catch {
+      // Without this, a rejected or never-resolving request (e.g. core
+      // crashed or never replied) leaves the button stuck on "Testing…"
+      // forever with no way to know why.
       setTestState("error");
-      setTestMessage(
-        result.status === "success"
-          ? result.content.message
-          : "Connection test failed.",
-      );
+      setTestMessage("Connection test failed.");
     }
   }
 
@@ -153,7 +161,10 @@ export function ConnectStep({
           type="button"
           data-testid="onboarding-connect-continue"
           onClick={onNext}
-          disabled={!canContinue}
+          // Advancing while a test request is still in flight unmounts this
+          // component before the response arrives, calling setState on an
+          // unmounted ConnectStep.
+          disabled={!canContinue || testState === "testing"}
         >
           Continue
         </Button>

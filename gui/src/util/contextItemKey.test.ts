@@ -30,7 +30,7 @@ describe("getContextItemKey", () => {
     expect(getContextItemKey(a)).not.toBe(getContextItemKey(b));
   });
 
-  it("falls back to provider+description when there's no uri", () => {
+  it("falls back to provider+name+description when there's no uri", () => {
     const a = item({
       id: { providerTitle: "codebase", itemId: "uuid-a" },
       uri: undefined,
@@ -42,5 +42,25 @@ describe("getContextItemKey", () => {
       description: "chunk 1",
     });
     expect(getContextItemKey(a)).toBe(getContextItemKey(b));
+  });
+
+  it("doesn't collide two different uri-less items that share a (or both lack a) description", () => {
+    // Regression: the fallback key used to be provider+description alone, so
+    // two distinct items from the same provider with an identical or both-
+    // undefined description hashed to the same key - excluding one silently
+    // excluded the other too.
+    const a = item({
+      id: { providerTitle: "terminal", itemId: "uuid-a" },
+      uri: undefined,
+      name: "Terminal 1",
+      description: "",
+    });
+    const b = item({
+      id: { providerTitle: "terminal", itemId: "uuid-b" },
+      uri: undefined,
+      name: "Terminal 2",
+      description: "",
+    });
+    expect(getContextItemKey(a)).not.toBe(getContextItemKey(b));
   });
 });

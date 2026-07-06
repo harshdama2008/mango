@@ -199,7 +199,10 @@ describe("Cost Dashboard end-to-end: logging + display", () => {
     const events = recordResponsesAcrossTwoSessions();
 
     const ideMessenger = new MockIdeMessenger();
-    ideMessenger.responses["costDashboard/getEvents"] = events;
+    ideMessenger.responses["costDashboard/getEvents"] = {
+      events,
+      trimmedBefore: null,
+    };
 
     await renderWithProviders(<CostDashboard />, {
       mockIdeMessenger: ideMessenger,

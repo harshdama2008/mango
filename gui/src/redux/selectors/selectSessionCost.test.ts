@@ -1,4 +1,6 @@
 import { ChatHistoryItem, PromptLog } from "core";
+import * as costModule from "core/llm/utils/calculateRequestCost";
+import { vi } from "vitest";
 import { selectSessionCost } from "./selectSessionCost";
 import { RootState } from "../store";
 
@@ -71,6 +73,38 @@ describe("selectSessionCost", () => {
       ]),
     ]);
     expect(selectSessionCost(state)).toBe(0);
+  });
+
+  it("caches per-item cost by promptLogs reference, so unchanged earlier items aren't recomputed", () => {
+    const spy = vi.spyOn(costModule, "calculateRequestCost");
+    const historyA = historyItem([
+      {
+        modelTitle: "Claude Sonnet",
+        modelProvider: "anthropic",
+        prompt: "",
+        completion: "",
+        usage: { promptTokens: 1000, completionTokens: 500 },
+      },
+    ]);
+    const historyB = historyItem([
+      {
+        modelTitle: "GPT-4o mini",
+        modelProvider: "openai",
+        prompt: "",
+        completion: "",
+        usage: { promptTokens: 1000, completionTokens: 500 },
+      },
+    ]);
+
+    selectSessionCost(stateWithHistory([historyA]));
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    // A new history array (new reference, so reselect's own memoization
+    // can't short-circuit) containing the same historyA object plus a new
+    // historyB - only historyB's log should trigger fresh cost calculation.
+    spy.mockClear();
+    selectSessionCost(stateWithHistory([historyA, historyB]));
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("resets to 0 when history is empty (new session)", () => {

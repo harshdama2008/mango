@@ -6,6 +6,8 @@ export interface SessionCostSummary {
   /** Timestamp of the most recent event recorded for this session */
   lastActivity: number;
   messageCount: number;
+  /** How many of messageCount had a real pricing-table entry (see CostDashboardEvent.isPriced) */
+  pricedMessageCount: number;
   totalCost: number;
 }
 
@@ -43,14 +45,18 @@ export function summarizeCostEvents(
   const modelsByKey = new Map<string, ModelCostSummary>();
 
   for (const event of events) {
+    // A negative age means the event's timestamp is ahead of `now` (clock
+    // skew, or a future-dated event) - without a lower bound it would still
+    // pass every "age <= WINDOW" check below and get counted in all three.
     const age = now - event.timestamp;
-    if (age <= DAY_MS) {
+    const isWithinWindow = age >= 0;
+    if (isWithinWindow && age <= DAY_MS) {
       totalToday += event.cost;
     }
-    if (age <= WEEK_MS) {
+    if (isWithinWindow && age <= WEEK_MS) {
       totalThisWeek += event.cost;
     }
-    if (age <= MONTH_MS) {
+    if (isWithinWindow && age <= MONTH_MS) {
       totalThisMonth += event.cost;
     }
 
@@ -58,6 +64,9 @@ export function summarizeCostEvents(
     if (session) {
       session.totalCost += event.cost;
       session.messageCount += 1;
+      if (event.isPriced) {
+        session.pricedMessageCount += 1;
+      }
       // Session titles can change after events are recorded (renames); keep
       // whichever title came from the most recent event.
       if (event.timestamp >= session.lastActivity) {
@@ -70,6 +79,7 @@ export function summarizeCostEvents(
         sessionTitle: event.sessionTitle,
         lastActivity: event.timestamp,
         messageCount: 1,
+        pricedMessageCount: event.isPriced ? 1 : 0,
         totalCost: event.cost,
       });
     }

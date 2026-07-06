@@ -180,6 +180,20 @@ describe("calculateRequestCost", () => {
     },
   ];
 
+  it("treats a missing promptTokens/completionTokens field as 0 rather than propagating NaN", () => {
+    // Some providers omit a usage field entirely instead of sending 0 - cast
+    // through `any` since the Usage type declares both fields required, but
+    // a provider's actual runtime payload isn't guaranteed to match that.
+    const usage = { completionTokens: 500 } as any as Usage;
+
+    const result = calculateRequestCost("anthropic", "Claude Sonnet", usage);
+
+    expect(result).not.toBeNull();
+    expect(Number.isNaN(result!.cost)).toBe(false);
+    expect(result!.cost).toBeCloseTo(0.0075, 6);
+    expect(result!.breakdown).not.toContain("NaN");
+  });
+
   testCases.forEach(
     ({
       provider,

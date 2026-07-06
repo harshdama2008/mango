@@ -97,4 +97,54 @@ describe("computeAutoRoutedTier", () => {
     expect(result.tier).toBe("powerful");
     expect(result.reason).toMatch(/agent/i);
   });
+
+  describe("isModeForced", () => {
+    it("is true when the mode itself forces the tier (agent/plan/background)", () => {
+      expect(
+        computeAutoRoutedTier({
+          mode: "agent",
+          messageLength: 1,
+          attachedFileCount: 0,
+        }).isModeForced,
+      ).toBe(true);
+      expect(
+        computeAutoRoutedTier({
+          mode: "plan",
+          messageLength: 1,
+          attachedFileCount: 0,
+        }).isModeForced,
+      ).toBe(true);
+      expect(
+        computeAutoRoutedTier({
+          mode: "background",
+          messageLength: 1,
+          attachedFileCount: 0,
+        }).isModeForced,
+      ).toBe(true);
+    });
+
+    it("is false for length- or multi-file-driven decisions in chat mode", () => {
+      expect(
+        computeAutoRoutedTier({
+          mode: "chat",
+          messageLength: 5,
+          attachedFileCount: 0,
+        }).isModeForced,
+      ).toBe(false);
+      expect(
+        computeAutoRoutedTier({
+          mode: "chat",
+          messageLength: SIMPLE_MESSAGE_CHAR_LIMIT + 1,
+          attachedFileCount: 0,
+        }).isModeForced,
+      ).toBe(false);
+      expect(
+        computeAutoRoutedTier({
+          mode: "chat",
+          messageLength: 1,
+          attachedFileCount: 3,
+        }).isModeForced,
+      ).toBe(false);
+    });
+  });
 });
