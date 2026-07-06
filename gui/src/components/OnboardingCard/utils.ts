@@ -1,5 +1,10 @@
+import { OnboardingModes } from "core/protocol/core";
 import { getLocalStorage, setLocalStorage } from "../../util/localStorage";
-import { OnboardingCardState } from "./OnboardingCard";
+
+export interface OnboardingCardState {
+  show?: boolean;
+  activeTab?: OnboardingModes;
+}
 
 // Note that there is no "NotStarted" status since the
 // local storage value is null until onboarding begins
@@ -26,9 +31,3 @@ export const defaultOnboardingCardState: OnboardingCardState = {
   show: false,
   activeTab: undefined,
 };
-
-export enum OllamaConnectionStatuses {
-  WaitingToDownload = "WaitingToDownload",
-  Downloading = "Downloading",
-  Connected = "Connected",
-}

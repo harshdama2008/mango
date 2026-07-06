@@ -238,6 +238,34 @@ async function fetchProviderModelsViaListModels(
   }
 }
 
+/**
+ * Validates a not-yet-saved provider + API key by making a real
+ * authenticated request, throwing with a descriptive message on failure.
+ * Unlike fetchModels(), this always checks the key itself - fetchModels()'s
+ * "openrouter" branch intentionally hits OpenRouter's public unauthenticated
+ * catalog instead (for populating a model list), which wouldn't catch a bad
+ * key. OpenRouter/OpenAI's listModels() is authenticated via the provider's
+ * own request headers, so routing them through fetchProviderModelsViaListModels
+ * here actually exercises the key.
+ */
+export async function testProviderConnection(
+  provider: string,
+  apiKey: string,
+  apiBase?: string,
+): Promise<void> {
+  switch (provider) {
+    case "anthropic":
+      await fetchAnthropicModels(apiKey);
+      return;
+    case "gemini":
+      await fetchGeminiModels(apiKey, apiBase);
+      return;
+    default:
+      await fetchProviderModelsViaListModels(provider, apiKey, apiBase);
+      return;
+  }
+}
+
 export async function fetchModels(
   provider: string,
   apiKey?: string,

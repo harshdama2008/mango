@@ -38,6 +38,8 @@ const DEFAULT_MOCK_CORE_RESPONSES: MockResponses = {
   ],
   "history/list": [],
   "docs/getIndexedPages": [],
+  "llm/listModels": [],
+  "llm/testConnection": { success: true, message: "Connection successful" },
   "history/save": undefined,
   "config/getSerializedProfileInfo": {
     profileId: "local",

@@ -13,7 +13,7 @@ import { CodebaseIndexer } from "./indexing/CodebaseIndexer";
 import DocsService from "./indexing/docs/DocsService";
 import { countTokens } from "./llm/countTokens";
 import Lemonade from "./llm/llms/Lemonade";
-import { fetchModels } from "./llm/fetchModels";
+import { fetchModels, testProviderConnection } from "./llm/fetchModels";
 import Ollama from "./llm/llms/Ollama";
 import { EditAggregator } from "./nextEdit/context/aggregateEdits";
 import { createNewPromptFileV2 } from "./promptFiles/createNewPromptFile";
@@ -1134,6 +1134,18 @@ export class Core {
       } catch (error: any) {
         void this.ide.showToast("error", error.message);
         return [];
+      }
+    });
+
+    on("llm/testConnection", async (msg) => {
+      try {
+        await testProviderConnection(msg.data.provider, msg.data.apiKey);
+        return { success: true, message: "Connection successful" };
+      } catch (error: any) {
+        return {
+          success: false,
+          message: error?.message ?? "Connection failed",
+        };
       }
     });
   }

@@ -330,4 +330,8 @@ export type ToCoreFromIdeOrWebviewProtocol = {
       supportsTools?: boolean;
     }[],
   ];
+  "llm/testConnection": [
+    { provider: string; apiKey: string },
+    { success: boolean; message: string },
+  ];
 };

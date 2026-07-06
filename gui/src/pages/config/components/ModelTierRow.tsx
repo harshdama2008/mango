@@ -26,7 +26,7 @@ export interface ModelTierRowProps {
 // ["chat", "summarize", "apply", "edit"] - "autocomplete" is NOT included
 // unless requested (see core/config/yaml/loadYaml.ts), so it must be added
 // explicitly here.
-const FULL_MODEL_ROLES: ModelRole[] = [
+export const FULL_MODEL_ROLES: ModelRole[] = [
   "chat",
   "autocomplete",
   "edit",

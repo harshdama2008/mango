@@ -36,6 +36,18 @@ export const EVERYDAY_MODEL_OPTIONS: RecommendedModel[] = [
     provider: "deepseek",
     model: "deepseek-coder",
   },
+  {
+    key: "openrouter-gpt-4o-mini",
+    displayName: "GPT-4o mini (OpenRouter)",
+    provider: "openrouter",
+    model: "openai/gpt-4o-mini",
+  },
+  {
+    key: "ollama-qwen-coder-small",
+    displayName: "Qwen2.5 Coder 1.5B (Ollama)",
+    provider: "ollama",
+    model: "qwen2.5-coder:1.5b-base",
+  },
 ];
 
 /**
@@ -60,6 +72,18 @@ export const POWERFUL_MODEL_OPTIONS: RecommendedModel[] = [
     displayName: "Gemini 1.5 Pro",
     provider: "gemini",
     model: "gemini-1.5-pro",
+  },
+  {
+    key: "openrouter-gpt-4o",
+    displayName: "GPT-4o (OpenRouter)",
+    provider: "openrouter",
+    model: "openai/gpt-4o",
+  },
+  {
+    key: "ollama-llama-3.1-8b",
+    displayName: "Llama 3.1 8B (Ollama)",
+    provider: "ollama",
+    model: "llama3.1:8b",
   },
 ];
 
@@ -105,9 +129,29 @@ export function matchesRecommendedModel(
       return m.includes("1.5") && m.includes("pro");
     case "deepseek-coder":
       return m.includes("coder");
+    case "openrouter-gpt-4o-mini":
+      return m.includes("gpt-4o") && m.includes("mini");
+    case "openrouter-gpt-4o":
+      return m.includes("gpt-4o") && !m.includes("mini");
+    case "ollama-qwen-coder-small":
+      return m.includes("qwen2.5-coder") && m.includes("1.5b");
+    case "ollama-llama-3.1-8b":
+      return m.includes("llama3.1") && m.includes("8b");
     default:
       return false;
   }
+}
+
+/** Recommended model options (everyday + powerful) scoped to one provider,
+ * for a UI (like onboarding) that lets a user pick a provider first. */
+export function getModelOptionsForProvider(provider: string): {
+  everyday: RecommendedModel[];
+  powerful: RecommendedModel[];
+} {
+  return {
+    everyday: EVERYDAY_MODEL_OPTIONS.filter((m) => m.provider === provider),
+    powerful: POWERFUL_MODEL_OPTIONS.filter((m) => m.provider === provider),
+  };
 }
 
 export function findConfiguredMatch<

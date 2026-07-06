@@ -2,6 +2,7 @@ import {
   EVERYDAY_MODEL_OPTIONS,
   findConfiguredMatch,
   findRecommendedModel,
+  getModelOptionsForProvider,
   matchesRecommendedModel,
   POWERFUL_MODEL_OPTIONS,
   resolveModelForTier,
@@ -167,6 +168,86 @@ describe("recommendedModels", () => {
       expect(
         resolveModelForTier("everyday", "gemini-1.5-flash", null, chatModels),
       ).toBeUndefined();
+    });
+  });
+
+  describe("getModelOptionsForProvider", () => {
+    it("returns exactly one everyday and one powerful option for each onboarding provider", () => {
+      for (const provider of [
+        "anthropic",
+        "openai",
+        "gemini",
+        "openrouter",
+        "ollama",
+      ]) {
+        const { everyday, powerful } = getModelOptionsForProvider(provider);
+        expect(everyday).toHaveLength(1);
+        expect(powerful).toHaveLength(1);
+        expect(everyday[0].provider).toBe(provider);
+        expect(powerful[0].provider).toBe(provider);
+      }
+    });
+
+    it("returns empty lists for a provider with no recommendations", () => {
+      const { everyday, powerful } = getModelOptionsForProvider("mistral");
+      expect(everyday).toEqual([]);
+      expect(powerful).toEqual([]);
+    });
+  });
+
+  describe("matchesRecommendedModel for OpenRouter and Ollama", () => {
+    it("matches OpenRouter GPT-4o mini vs GPT-4o", () => {
+      const mini = EVERYDAY_MODEL_OPTIONS.find(
+        (m) => m.key === "openrouter-gpt-4o-mini",
+      )!;
+      const full = POWERFUL_MODEL_OPTIONS.find(
+        (m) => m.key === "openrouter-gpt-4o",
+      )!;
+      expect(
+        matchesRecommendedModel(
+          { provider: "openrouter", model: "openai/gpt-4o-mini" },
+          mini,
+        ),
+      ).toBe(true);
+      expect(
+        matchesRecommendedModel(
+          { provider: "openrouter", model: "openai/gpt-4o" },
+          full,
+        ),
+      ).toBe(true);
+      expect(
+        matchesRecommendedModel(
+          { provider: "openrouter", model: "openai/gpt-4o" },
+          mini,
+        ),
+      ).toBe(false);
+    });
+
+    it("matches Ollama's small and large recommended models", () => {
+      const small = EVERYDAY_MODEL_OPTIONS.find(
+        (m) => m.key === "ollama-qwen-coder-small",
+      )!;
+      const large = POWERFUL_MODEL_OPTIONS.find(
+        (m) => m.key === "ollama-llama-3.1-8b",
+      )!;
+      expect(
+        matchesRecommendedModel(
+          { provider: "ollama", model: "qwen2.5-coder:1.5b-base" },
+          small,
+        ),
+      ).toBe(true);
+      expect(
+        matchesRecommendedModel(
+          { provider: "ollama", model: "llama3.1:8b" },
+          large,
+        ),
+      ).toBe(true);
+      expect(
+        matchesRecommendedModel(
+          { provider: "ollama", model: "llama3.1:8b" },
+          small,
+        ),
+      ).toBe(false);
     });
   });
 });

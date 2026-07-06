@@ -22,6 +22,7 @@ import { NewSessionButton } from "../../components/mainInput/belowMainInput/NewS
 import { SessionCostIndicator } from "../../components/mainInput/belowMainInput/SessionCostIndicator";
 import ThinkingBlockPeek from "../../components/mainInput/belowMainInput/ThinkingBlockPeek";
 import MangoInputBox from "../../components/mainInput/MangoInputBox";
+import { CompleteSetupBanner } from "../../components/onboarding/CompleteSetupBanner";
 import { useOnboardingCard } from "../../components/OnboardingCard";
 import StepContainer from "../../components/StepContainer";
 import { TabBar } from "../../components/TabBar/TabBar";
@@ -469,6 +470,7 @@ export function Chat() {
             </div>
           ))}
       </StepsDiv>
+      <CompleteSetupBanner />
       <div className={"relative shrink-0"}>
         <MangoInputBox
           isMainInput

@@ -17,11 +17,7 @@ import { ROUTES } from "../util/navigation";
 import { FatalErrorIndicator } from "./config/FatalErrorNotice";
 import TextDialog from "./dialogs";
 import { useMainEditor } from "./mainInput/TipTapEditor";
-import {
-  isNewUserOnboarding,
-  OnboardingCard,
-  useOnboardingCard,
-} from "./OnboardingCard";
+import { isNewUserOnboarding, useOnboardingCard } from "./OnboardingCard";
 import OSRContextMenu from "./OSRContextMenu";
 
 const LayoutTopDiv = styled(CustomScrollbarDiv)`
