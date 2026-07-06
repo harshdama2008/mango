@@ -5,7 +5,7 @@
 <div align="center">
 
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" /></a>
-<a href="https://github.com/harshdama2008/mango"><img src="https://img.shields.io/badge/View_source-181717?logo=github&logoColor=white" /></a>
+<a href="https://github.com/harshdama2008/dwarf"><img src="https://img.shields.io/badge/View_source-181717?logo=github&logoColor=white" /></a>
 
 </div>
 
@@ -32,8 +32,8 @@ No subscription. No account. Bring your own API key, and everything runs from yo
 Dwarf isn't published to the VS Code Marketplace. To install it, build the extension from source:
 
 ```sh
-git clone https://github.com/harshdama2008/mango.git
-cd mango/extensions/vscode
+git clone https://github.com/harshdama2008/dwarf.git
+cd dwarf/extensions/vscode
 npm install
 npm run package
 ```
